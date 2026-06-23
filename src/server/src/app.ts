@@ -1,23 +1,42 @@
 import { serve } from '@hono/node-server'
-import { Hono } from 'hono'
+import { OpenAPIHono } from '@hono/zod-openapi'
 import 'dotenv/config';
-import { drizzle } from 'drizzle-orm/node-postgres';
-import { usersTable } from './db/schema.js';
+import { candidatesRouter } from './routes/candidates.js';
+import { db } from './db/connection.js';
+import { Scalar } from '@scalar/hono-api-reference';
 
-const db = drizzle(process.env.DATABASE_URL!);
 
-const app = new Hono<{ Variables: { db: typeof db } }>()
+const app = new OpenAPIHono()
 
-app.use(async (c, next) => {
-  c.set('db', db);
-  await next();
+app.get('/-/db/health', async (c) => {
+  try {
+    await db.execute('SELECT 1');
+    return c.json({
+      status: 'ok',
+      message: 'Database is healthy',
+    });
+  } catch (error) {
+    return c.json({
+      status: 'error',
+      message: 'Database is not healthy',
+    }, 500);
+  }
 })
 
-app.get('/', async (c) => {
-  const db = c.get('db');
-  const result = await db.select().from(usersTable);
-  return c.json(result);
-})
+app.route('/', candidatesRouter);
+
+app.doc('/-/docs', {
+  openapi: '3.0.0',
+  info: {
+    title: 'Web internal API Documentation',
+    version: 'web.0.1',
+  },
+});
+
+
+app.get('/-/scalar', Scalar({
+  url: '/-/docs',
+}))
 
 serve({
   fetch: app.fetch,
