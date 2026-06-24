@@ -2,6 +2,7 @@ import { serve } from '@hono/node-server'
 import { OpenAPIHono } from '@hono/zod-openapi'
 import 'dotenv/config';
 import { candidatesRouter } from './routes/candidates.js';
+import { jobsRouter } from './routes/jobs.js';
 import { db } from './db/connection.js';
 import { Scalar } from '@scalar/hono-api-reference';
 
@@ -24,6 +25,7 @@ app.get('/-/db/health', async (c) => {
 })
 
 app.route('/', candidatesRouter);
+app.route('/', jobsRouter);
 
 app.doc('/-/docs', {
   openapi: '3.0.0',
