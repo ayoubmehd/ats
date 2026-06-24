@@ -206,6 +206,15 @@ app.openapi(nextStageRoute, async (c) => {
     .from(applicationsTable)
     .where(eq(applicationsTable.id, id));
 
+  if (!application) {
+    return c.json(
+      {
+        message: "Application not found",
+      },
+      404,
+    );
+  }
+
   const currentStage = application.status;
   type ApplicationStatus = typeof applicationsTable.status.enumValues;
   let nextStage: ApplicationStatus[number] = currentStage;
