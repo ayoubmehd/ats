@@ -74,12 +74,27 @@ export const getCandidateRoute = createRoute({
       },
       description: "Get a candidate by id",
     },
+    404: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            message: z.string(),
+          }),
+        },
+      },
+      description: "Candidate not found",
+    },
   },
 });
 
 app.openapi(getCandidateRoute, async (c) => {
   const { id } = c.req.valid('param');
   const [candidate] = await db.select().from(candidatesTable).where(eq(candidatesTable.id, id));
+  if (!candidate) {
+    return c.json({
+      message: 'Candidate not found',
+    }, 404);
+  }
   return c.json({
     id: candidate.id,
     username: candidate.username,
@@ -187,6 +202,39 @@ app.openapi(updateCandidateRoute, async (c) => {
     email: candidate.email,
   }, 200);
 });
+
+export const deleteCandidateRoute = createRoute({
+  method: 'delete',
+  path: '/candidates/{id}',
+  request: {
+    params: z.object({
+      id: z.coerce.number().openapi({
+        example: 121,
+      }),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        'application/json': {
+          schema: z.object({
+            message: z.string(),
+          }),
+        },
+      },
+      description: 'Candidate deleted successfully',
+    },
+  },
+});
+
+app.openapi(deleteCandidateRoute, async (c) => {
+  const { id } = c.req.valid('param');
+  await db.delete(candidatesTable).where(eq(candidatesTable.id, id));
+  return c.json({
+    message: 'Candidate deleted successfully',
+  }, 200);
+});
+
 export {
   app as candidatesRouter,
 };

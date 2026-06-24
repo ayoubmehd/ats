@@ -72,6 +72,24 @@ test("update candidate", async () => {
   expect(body.email).toBe("john.doe.2@example.com");
 });
 
+test("delete candidate", async () => {
+  const response = await candidatesRouter.request(`/candidates/${lastCandidateId}`, {
+    method: "DELETE",
+  });
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toBeDefined();
+  expect(body.message).toBe("Candidate deleted successfully");
+});
+
+test("get deleted candidate", async () => {
+  const response = await candidatesRouter.request(`/candidates/${lastCandidateId}`);
+  expect(response.status).toBe(404);
+  const body = await response.json();
+  expect(body).toBeDefined();
+  expect(body.message).toBe("Candidate not found");
+});
+
 afterAll(async () => {
   await db.execute("ROLLBACK");
 });
