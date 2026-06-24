@@ -1,48 +1,57 @@
-import { serve } from '@hono/node-server'
-import { OpenAPIHono } from '@hono/zod-openapi'
-import 'dotenv/config';
-import { candidatesRouter } from './routes/candidates.js';
-import { jobsRouter } from './routes/jobs.js';
-import { db } from './db/connection.js';
-import { Scalar } from '@scalar/hono-api-reference';
+import { serve } from "@hono/node-server";
+import { OpenAPIHono } from "@hono/zod-openapi";
+import "dotenv/config";
+import { candidatesRouter } from "./routes/candidates.js";
+import { jobsRouter } from "./routes/jobs.js";
+import { db } from "./db/connection.js";
+import { Scalar } from "@scalar/hono-api-reference";
+import { applicationsRouter } from "./routes/applications.js";
 
+const app = new OpenAPIHono();
 
-const app = new OpenAPIHono()
-
-app.get('/-/db/health', async (c) => {
+app.get("/-/db/health", async (c) => {
   try {
-    await db.execute('SELECT 1');
+    await db.execute("SELECT 1");
     return c.json({
-      status: 'ok',
-      message: 'Database is healthy',
+      status: "ok",
+      message: "Database is healthy",
     });
   } catch (error) {
-    return c.json({
-      status: 'error',
-      message: 'Database is not healthy',
-    }, 500);
+    return c.json(
+      {
+        status: "error",
+        message: "Database is not healthy",
+      },
+      500,
+    );
   }
-})
+});
 
-app.route('/', candidatesRouter);
-app.route('/', jobsRouter);
+app.route("/", candidatesRouter);
+app.route("/", jobsRouter);
+app.route("/", applicationsRouter);
 
-app.doc('/-/docs', {
-  openapi: '3.0.0',
+app.doc("/-/docs", {
+  openapi: "3.0.0",
   info: {
-    title: 'Web internal API Documentation',
-    version: 'web.0.1',
+    title: "Web internal API Documentation",
+    version: "web.0.1",
   },
 });
 
+app.get(
+  "/-/scalar",
+  Scalar({
+    url: "/-/docs",
+  }),
+);
 
-app.get('/-/scalar', Scalar({
-  url: '/-/docs',
-}));
-
-serve({
-  fetch: app.fetch,
-  port: 3000
-}, (info) => {
-  console.log(`Server is running on http://localhost:${info.port}`)
-});
+serve(
+  {
+    fetch: app.fetch,
+    port: 3000,
+  },
+  (info) => {
+    console.log(`Server is running on http://localhost:${info.port}`);
+  },
+);

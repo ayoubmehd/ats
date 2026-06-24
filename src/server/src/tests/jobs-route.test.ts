@@ -1,5 +1,5 @@
 import { db } from "../db/connection.js";
-import { jobsTable, usersTable } from "../db/schema.js";
+import { applicationsTable, jobsTable, usersTable } from "../db/schema.js";
 import { jobsRouter } from "../routes/jobs.js";
 import { test, expect, beforeAll, afterAll } from "vitest";
 
@@ -7,13 +7,17 @@ let posterId: number;
 
 beforeAll(async () => {
   await db.execute("BEGIN");
+  await db.delete(applicationsTable);
   await db.delete(jobsTable);
   await db.delete(usersTable);
-  const [user] = await db.insert(usersTable).values({
-    username: "Recruiter",
-    email: "recruiter@example.com",
-    role: "recruiter",
-  }).returning();
+  const [user] = await db
+    .insert(usersTable)
+    .values({
+      username: "Recruiter",
+      email: "recruiter@example.com",
+      role: "recruiter",
+    })
+    .returning();
   posterId = user.id;
   await db.insert(jobsTable).values({
     title: "Software Engineer",

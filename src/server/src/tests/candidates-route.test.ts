@@ -1,10 +1,12 @@
 import { db } from "../db/connection.js";
-import { usersTable } from "../db/schema.js";
+import { jobsTable, applicationsTable, usersTable } from "../db/schema.js";
 import { candidatesRouter } from "../routes/candidates.js";
 import { test, expect, beforeAll, afterAll } from "vitest";
 
 beforeAll(async () => {
   await db.execute("BEGIN");
+  await db.delete(applicationsTable);
+  await db.delete(jobsTable);
   await db.delete(usersTable);
   await db.insert(usersTable).values({
     username: "John Doe",
@@ -44,7 +46,9 @@ test("create candidate", async () => {
 });
 
 test("get candidate", async () => {
-  const response = await candidatesRouter.request(`/candidates/${lastCandidateId}`);
+  const response = await candidatesRouter.request(
+    `/candidates/${lastCandidateId}`,
+  );
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body).toBeDefined();
@@ -54,16 +58,19 @@ test("get candidate", async () => {
 });
 
 test("update candidate", async () => {
-  const response = await candidatesRouter.request(`/candidates/${lastCandidateId}`, {
-    method: "PUT",
-    body: JSON.stringify({
-      username: "John Doe 2",
-      email: "john.doe.2@example.com",
-    }),
-    headers: {
-      "Content-Type": "application/json",
+  const response = await candidatesRouter.request(
+    `/candidates/${lastCandidateId}`,
+    {
+      method: "PUT",
+      body: JSON.stringify({
+        username: "John Doe 2",
+        email: "john.doe.2@example.com",
+      }),
+      headers: {
+        "Content-Type": "application/json",
+      },
     },
-  });
+  );
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body).toBeDefined();
@@ -73,9 +80,12 @@ test("update candidate", async () => {
 });
 
 test("delete candidate", async () => {
-  const response = await candidatesRouter.request(`/candidates/${lastCandidateId}`, {
-    method: "DELETE",
-  });
+  const response = await candidatesRouter.request(
+    `/candidates/${lastCandidateId}`,
+    {
+      method: "DELETE",
+    },
+  );
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body).toBeDefined();
@@ -83,7 +93,9 @@ test("delete candidate", async () => {
 });
 
 test("get deleted candidate", async () => {
-  const response = await candidatesRouter.request(`/candidates/${lastCandidateId}`);
+  const response = await candidatesRouter.request(
+    `/candidates/${lastCandidateId}`,
+  );
   expect(response.status).toBe(404);
   const body = await response.json();
   expect(body).toBeDefined();

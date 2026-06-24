@@ -121,12 +121,14 @@ export const createApplicationRoute = createRoute({
 });
 
 app.openapi(createApplicationRoute, async (c) => {
+  const envVars = process.env;
+
   const { jobId, resume, resumeText } = await c.req.valid("json");
   // No auth for now, will use hardcoded email for candidate
   const [user] = await db
     .select()
     .from(usersTable)
-    .where(eq(usersTable.email, "candidate.1@example.com"));
+    .where(eq(usersTable.email, envVars.TEST_EMAIL ?? "jane@example.com"));
   if (!user) {
     return c.json(
       {

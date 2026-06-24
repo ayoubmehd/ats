@@ -2,9 +2,12 @@ import { db } from "../db/connection.js";
 import { applicationsTable, jobsTable, usersTable } from "../db/schema.js";
 import { applicationsRouter } from "../routes/applications.js";
 import { test, expect, beforeAll, afterAll } from "vitest";
+import { config } from "dotenv";
+config({
+  path: ".test.env",
+});
 
 let posterId: number;
-let jobId: number;
 
 beforeAll(async () => {
   await db.execute("BEGIN");
@@ -80,7 +83,6 @@ beforeAll(async () => {
       posterId: otherRecruiter.id,
     })
     .returning();
-  jobId = otherJob.id;
   await db.insert(applicationsTable).values({
     jobId: otherJob.id,
     candidateId: candidate.id,
@@ -102,6 +104,17 @@ test("get applications", async () => {
 let applicationId: number;
 
 test("create application", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Software Engineer",
+      summary: "A great opportunity",
+      content: "Full job description here",
+      status: "open",
+      posterId: posterId,
+    })
+    .returning();
+  const jobId = job.id;
   const response = await applicationsRouter.request("/applications", {
     method: "POST",
     body: JSON.stringify({
