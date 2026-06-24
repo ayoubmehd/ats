@@ -54,6 +54,6 @@ export const applicationsTable = pgTable("applications", {
   }).default('applied').notNull(),
   ...softDelete,
 },(t) => [
-  unique("application_unique_candidate_job").on(t.jobId, t.candidateId),
+  unique("application_unique_candidate_job").on(t.jobId, t.candidateId).nullsNotDistinct(),
 ]);
 
