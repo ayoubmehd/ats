@@ -99,6 +99,8 @@ test("get applications", async () => {
   expect(body.every((app: any) => app.posterId === posterId)).toBe(true);
 });
 
+let applicationId: number;
+
 test("create application", async () => {
   const response = await applicationsRouter.request("/applications", {
     method: "POST",
@@ -115,10 +117,97 @@ test("create application", async () => {
   const body = await response.json();
   expect(body).toBeDefined();
   expect(body.id).toBeDefined();
+  applicationId = body.id;
   expect(body.jobId).toBe(jobId);
   expect(body.candidateId).toBeDefined();
   expect(body.resume).toBe("https://example.com/resume.pdf");
   expect(body.resumeText).toBe("Full resume text here");
+});
+
+test("next stage screening", async () => {
+  const response = await applicationsRouter.request(
+    `/applications/${applicationId}/next-stage`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toBeDefined();
+  expect(body.id).toBe(applicationId);
+  expect(body.status).toBe("screening");
+});
+
+test("next stage interview", async () => {
+  const response = await applicationsRouter.request(
+    `/applications/${applicationId}/next-stage`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toBeDefined();
+  expect(body.id).toBe(applicationId);
+  expect(body.status).toBe("interview");
+});
+
+test("next stage offer", async () => {
+  const response = await applicationsRouter.request(
+    `/applications/${applicationId}/next-stage`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toBeDefined();
+  expect(body.id).toBe(applicationId);
+  expect(body.status).toBe("offer");
+});
+
+test("next stage hired", async () => {
+  const response = await applicationsRouter.request(
+    `/applications/${applicationId}/next-stage`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toBeDefined();
+  expect(body.id).toBe(applicationId);
+  expect(body.status).toBe("hired");
+});
+
+test("reject application", async () => {
+  const response = await applicationsRouter.request(
+    `/applications/${applicationId}/reject`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body).toBeDefined();
+  expect(body.id).toBe(applicationId);
+  expect(body.status).toBe("rejected");
 });
 
 afterAll(async () => {

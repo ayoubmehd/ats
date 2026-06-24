@@ -157,4 +157,190 @@ app.openapi(createApplicationRoute, async (c) => {
   );
 });
 
+const nextStageRoute = createRoute({
+  method: "post",
+  path: "/applications/{id}/next-stage",
+  request: {
+    params: z.object({
+      id: z.coerce.number(),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: ApplicationSchema,
+        },
+      },
+      description: "Move application to next stage",
+    },
+    404: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            message: z.string(),
+          }),
+        },
+      },
+      description: "Application not found",
+    },
+    400: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            message: z.string(),
+          }),
+        },
+      },
+      description: "Application is already in the last stage",
+    },
+  },
+});
+
+app.openapi(nextStageRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const [application] = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.id, id));
+
+  const currentStage = application.status;
+  type ApplicationStatus = typeof applicationsTable.status.enumValues;
+  let nextStage: ApplicationStatus[number] = currentStage;
+
+  if (!application) {
+    return c.json(
+      {
+        message: "Application not found",
+      },
+      404,
+    );
+  }
+
+  switch (currentStage) {
+    case "applied":
+      nextStage = "screening";
+      break;
+    case "screening":
+      nextStage = "interview";
+      break;
+    case "interview":
+      nextStage = "offer";
+      break;
+    case "offer":
+      nextStage = "hired";
+      break;
+    default:
+      return c.json(
+        {
+          message: "Application is already in the last stage",
+        },
+        400,
+      );
+  }
+  const [updatedApplication] = await db
+    .update(applicationsTable)
+    .set({ status: nextStage })
+    .where(eq(applicationsTable.id, id))
+    .returning();
+
+  return c.json(
+    {
+      id: updatedApplication.id,
+      jobId: updatedApplication.jobId,
+      candidateId: updatedApplication.candidateId,
+      resume: updatedApplication.resume ?? "",
+      resumeText: updatedApplication.resumeText ?? "",
+      status: updatedApplication.status,
+      posterId: null,
+    },
+    200,
+  );
+});
+
+const rejectApplicationRoute = createRoute({
+  method: "post",
+  path: "/applications/{id}/reject",
+  request: {
+    params: z.object({
+      id: z.coerce.number(),
+    }),
+  },
+  responses: {
+    200: {
+      content: {
+        "application/json": {
+          schema: ApplicationSchema,
+        },
+      },
+      description: "Reject application",
+    },
+    404: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            message: z.string(),
+          }),
+        },
+      },
+      description: "Application not found",
+    },
+    400: {
+      content: {
+        "application/json": {
+          schema: z.object({
+            message: z.string(),
+          }),
+        },
+      },
+      description: "Application is already rejected",
+    },
+  },
+});
+
+app.openapi(rejectApplicationRoute, async (c) => {
+  const { id } = c.req.valid("param");
+  const [application] = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.id, id));
+
+  if (!application) {
+    return c.json(
+      {
+        message: "Application not found",
+      },
+      404,
+    );
+  }
+
+  if (application.status === "rejected") {
+    return c.json(
+      {
+        message: "Application is already rejected",
+      },
+      400,
+    );
+  }
+
+  const [updatedApplication] = await db
+    .update(applicationsTable)
+    .set({ status: "rejected" })
+    .where(eq(applicationsTable.id, id))
+    .returning();
+
+  return c.json(
+    {
+      id: updatedApplication.id,
+      jobId: updatedApplication.jobId,
+      candidateId: updatedApplication.candidateId,
+      resume: updatedApplication.resume ?? "",
+      resumeText: updatedApplication.resumeText ?? "",
+      status: updatedApplication.status,
+      posterId: null,
+    },
+    200,
+  );
+});
+
 export { app as applicationsRouter };
