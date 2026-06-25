@@ -120,6 +120,15 @@ export const createApplicationRoute = createRoute({
   },
 });
 
+const VALID_TRANSITIONS = {
+  applied: "screening",
+  screening: "interview",
+  interview: "offer",
+  offer: "hired",
+  rejected: "rejected",
+  hired: "hired",
+} as const;
+
 app.openapi(createApplicationRoute, async (c) => {
   const envVars = process.env;
 
@@ -216,8 +225,6 @@ app.openapi(nextStageRoute, async (c) => {
   }
 
   const currentStage = application.status;
-  type ApplicationStatus = typeof applicationsTable.status.enumValues;
-  let nextStage: ApplicationStatus[number] = currentStage;
 
   if (!application) {
     return c.json(
@@ -228,27 +235,17 @@ app.openapi(nextStageRoute, async (c) => {
     );
   }
 
-  switch (currentStage) {
-    case "applied":
-      nextStage = "screening";
-      break;
-    case "screening":
-      nextStage = "interview";
-      break;
-    case "interview":
-      nextStage = "offer";
-      break;
-    case "offer":
-      nextStage = "hired";
-      break;
-    default:
-      return c.json(
-        {
-          message: "Application is already in the last stage",
-        },
-        400,
-      );
+  const nextStage = VALID_TRANSITIONS[currentStage] ?? currentStage;
+
+  if (nextStage === "hired" && currentStage === "hired") {
+    return c.json(
+      {
+        message: "Application is already in the last stage",
+      },
+      400,
+    );
   }
+
   const [updatedApplication] = await db
     .update(applicationsTable)
     .set({ status: nextStage })
@@ -329,6 +326,15 @@ app.openapi(rejectApplicationRoute, async (c) => {
     return c.json(
       {
         message: "Application is already rejected",
+      },
+      400,
+    );
+  }
+
+  if (application.status === "hired") {
+    return c.json(
+      {
+        message: "Application is already hired",
       },
       400,
     );

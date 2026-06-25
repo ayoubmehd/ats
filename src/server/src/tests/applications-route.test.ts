@@ -1,38 +1,22 @@
-import { db } from "../db/connection.js";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { pool } from "../db/connection.js";
 import { applicationsTable, jobsTable, usersTable } from "../db/schema.js";
 import { applicationsRouter } from "../routes/applications.js";
-import { test, expect, beforeAll, afterAll } from "vitest";
-import { eq, getTableName, sql } from "drizzle-orm";
-import { config } from "dotenv";
-config({
-  path: ".test.env",
-});
+import { test, expect, beforeAll } from "vitest";
+import { eq } from "drizzle-orm";
+const client = await pool.connect();
+const db = drizzle(client);
 
 let posterId: number;
+let applicationToRejectId: number;
 
 beforeAll(async () => {
-  await db.execute("BEGIN");
-  await db.delete(applicationsTable);
-  await db.delete(jobsTable);
-  await db.delete(usersTable);
-  const table = (t: any) => sql.identifier(getTableName(t));
-  await db.execute(
-    sql`TRUNCATE TABLE ${table(applicationsTable)} RESTART IDENTITY`,
-  );
-  await db.execute(
-    sql`TRUNCATE TABLE ${table(jobsTable)} RESTART IDENTITY CASCADE`,
-  );
-  await db.execute(
-    sql`TRUNCATE TABLE ${table(usersTable)} RESTART IDENTITY CASCADE`,
-  );
   const [user] = await db
-    .insert(usersTable)
-    .values({
-      username: "Recruiter",
-      email: "recruiter@example.com",
-      role: "recruiter",
-    })
-    .returning();
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, "recruiter@example.com"))
+    .limit(1);
+
   posterId = user.id;
   const [candidate] = await db
     .insert(usersTable)
@@ -67,14 +51,17 @@ beforeAll(async () => {
       role: "candidate",
     })
     .returning();
-  await db.insert(applicationsTable).values({
-    jobId: job.id,
-    candidateId: otherCandidate.id,
-    resume: "https://example.com/resume.pdf",
-    resumeText: "Full resume text here",
-    status: "applied",
-  });
-
+  const [{ id }] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: job.id,
+      candidateId: otherCandidate.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Full resume text here",
+      status: "applied",
+    })
+    .returning();
+  applicationToRejectId = id;
   const [otherRecruiter] = await db
     .insert(usersTable)
     .values({
@@ -234,7 +221,7 @@ test("next stage already last stage", async () => {
 
 test("reject application", async () => {
   const response = await applicationsRouter.request(
-    `/applications/${applicationId}/reject`,
+    `/applications/${applicationToRejectId}/reject`,
     {
       method: "POST",
       headers: {
@@ -245,13 +232,13 @@ test("reject application", async () => {
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body).toBeDefined();
-  expect(body.id).toBe(applicationId);
+  expect(body.id).toBe(applicationToRejectId);
   expect(body.status).toBe("rejected");
 });
 
 test("reject already rejected application", async () => {
   const response = await applicationsRouter.request(
-    `/applications/${applicationId}/reject`,
+    `/applications/${applicationToRejectId}/reject`,
     {
       method: "POST",
       headers: {
@@ -331,6 +318,17 @@ test("create application candidate not found", async () => {
   expect(body.message).toBe("Candidate not found");
 });
 
-afterAll(async () => {
-  await db.execute("ROLLBACK");
+test("reject already hired application", async () => {
+  const response = await applicationsRouter.request(
+    `/applications/${applicationId}/reject`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    },
+  );
+  expect(response.status).toBe(400);
+  const body = await response.json();
+  expect(body.message).toBe("Application is already hired");
 });

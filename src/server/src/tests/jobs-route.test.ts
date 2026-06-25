@@ -1,24 +1,21 @@
-import { db } from "../db/connection.js";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { pool } from "../db/connection.js";
 import { applicationsTable, jobsTable, usersTable } from "../db/schema.js";
 import { jobsRouter } from "../routes/jobs.js";
 import { test, expect, beforeAll, afterAll } from "vitest";
+import { eq } from "drizzle-orm";
+const client = await pool.connect();
+const db = drizzle(client);
 
 let posterId: number;
 
 beforeAll(async () => {
-  await db.execute("BEGIN");
-  await db.delete(applicationsTable);
-  await db.delete(jobsTable);
-  await db.delete(usersTable);
-  const [user] = await db
-    .insert(usersTable)
-    .values({
-      username: "Recruiter",
-      email: "recruiter@example.com",
-      role: "recruiter",
-    })
-    .returning();
-  posterId = user.id;
+  const [{ id }] = await db
+    .select()
+    .from(usersTable)
+    .where(eq(usersTable.email, "recruiter@example.com"))
+    .limit(1);
+  posterId = id;
   await db.insert(jobsTable).values({
     title: "Software Engineer",
     summary: "A great opportunity",
@@ -119,8 +116,4 @@ test("get deleted job", async () => {
   const body = await response.json();
   expect(body).toBeDefined();
   expect(body.message).toBe("Job not found");
-});
-
-afterAll(async () => {
-  await db.execute("ROLLBACK");
 });

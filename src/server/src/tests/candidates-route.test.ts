@@ -1,13 +1,12 @@
-import { db } from "../db/connection.js";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { pool } from "../db/connection.js";
 import { jobsTable, applicationsTable, usersTable } from "../db/schema.js";
 import { candidatesRouter } from "../routes/candidates.js";
 import { test, expect, beforeAll, afterAll } from "vitest";
+const client = await pool.connect();
+const db = drizzle(client);
 
 beforeAll(async () => {
-  await db.execute("BEGIN");
-  await db.delete(applicationsTable);
-  await db.delete(jobsTable);
-  await db.delete(usersTable);
   await db.insert(usersTable).values({
     username: "John Doe",
     email: "john.doe@example.com",
@@ -100,8 +99,4 @@ test("get deleted candidate", async () => {
   const body = await response.json();
   expect(body).toBeDefined();
   expect(body.message).toBe("Candidate not found");
-});
-
-afterAll(async () => {
-  await db.execute("ROLLBACK");
 });
