@@ -12,13 +12,14 @@
 | status     | job_status_enum  | NOT NULL, default 'open' |
 | createdAt  | timestamp    | NOT NULL, default now()  |
 
-### candidates
+### Users
 | Column     | Type         | Constraints             |
 |------------|--------------|-------------------------|
 | id         | serial       | PRIMARY KEY             |
 | name       | varchar(256) | NOT NULL                |
 | email      | varchar(256) | NOT NULL, UNIQUE        |
 | phone      | varchar(32)  | nullable                |
+| role       | varchar(32)  | NOT NULL, default 'candidate' |
 | createdAt  | timestamp    | NOT NULL, default now() |
 
 ### applications

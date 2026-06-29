@@ -9,6 +9,12 @@ services:
       POSTGRES_DB: ats_db
     volumes:
       - pg_data:/var/lib/postgresql
+      - ./src/db/.pgpass:/home/postgres/.pgpass
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
 volumes:
   pg_data:
