@@ -1,17 +1,5 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { pool } from "../db/connection.js";
-import { jobsTable, applicationsTable, usersTable } from "../db/schema.js";
 import { candidatesRouter } from "../routes/candidates.js";
-import { test, expect, beforeAll, afterAll } from "vitest";
-const client = await pool.connect();
-const db = drizzle(client);
-
-beforeAll(async () => {
-  await db.insert(usersTable).values({
-    username: "John Doe",
-    email: "john.doe@example.com",
-  });
-});
+import { test, expect } from "vitest";
 
 test("get candidates", async () => {
   const response = await candidatesRouter.request("/candidates");

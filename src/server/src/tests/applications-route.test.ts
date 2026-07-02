@@ -4,6 +4,7 @@ import { applicationsTable, jobsTable, usersTable } from "../db/schema.js";
 import { applicationsRouter } from "../routes/applications.js";
 import { test, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
+import { getOrCreateCandidate, getOrCreateRecruiter } from "./utils.js";
 const client = await pool.connect();
 const db = drizzle(client);
 
@@ -11,21 +12,11 @@ let posterId: number;
 let applicationToRejectId: number;
 
 beforeAll(async () => {
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, "recruiter@example.com"))
-    .limit(1);
-
+  const user = await getOrCreateRecruiter({ email: "recruiter@example.com" });
   posterId = user.id;
-  const [candidate] = await db
-    .insert(usersTable)
-    .values({
-      username: "Candidate",
-      email: "candidate@example.com",
-      role: "candidate",
-    })
-    .returning();
+  const candidate = await getOrCreateCandidate({
+    email: "candidate@example.com",
+  });
   const [job] = await db
     .insert(jobsTable)
     .values({
@@ -43,14 +34,9 @@ beforeAll(async () => {
     resumeText: "Full resume text here",
     status: "applied",
   });
-  const [otherCandidate] = await db
-    .insert(usersTable)
-    .values({
-      username: "Candidate",
-      email: "candidate.1@example.com",
-      role: "candidate",
-    })
-    .returning();
+  const otherCandidate = await getOrCreateCandidate({
+    email: "candidate.1@example.com",
+  });
   const [{ id }] = await db
     .insert(applicationsTable)
     .values({
@@ -62,14 +48,9 @@ beforeAll(async () => {
     })
     .returning();
   applicationToRejectId = id;
-  const [otherRecruiter] = await db
-    .insert(usersTable)
-    .values({
-      username: "Recruiter",
-      email: "recruiter.1@example.com",
-      role: "recruiter",
-    })
-    .returning();
+  const otherRecruiter = await getOrCreateRecruiter({
+    email: "recruiter.1@example.com",
+  });
 
   const [otherJob] = await db
     .insert(jobsTable)
