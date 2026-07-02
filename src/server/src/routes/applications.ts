@@ -3,7 +3,7 @@ import { createRoute } from "@hono/zod-openapi";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { applicationsTable, jobsTable, usersTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 
 const app = new OpenAPIHono();
 
@@ -61,16 +61,13 @@ app.openapi(getApplicationsRoute, async (c) => {
       404,
     );
   }
-  const sq = db
-    .select()
-    .from(jobsTable)
-    .where(eq(jobsTable.posterId, user.id))
-    .as("sq");
   const result = await db
     .select()
     .from(applicationsTable)
-    .where(eq(sq.posterId, user.id))
-    .leftJoin(sq, eq(applicationsTable.jobId, sq.id));
+    .innerJoin(jobsTable, eq(applicationsTable.jobId, jobsTable.id))
+    .where(
+      and(eq(jobsTable.posterId, user.id), isNull(applicationsTable.deletedAt)),
+    );
 
   return c.json(
     result.map((application) => ({
@@ -79,7 +76,7 @@ app.openapi(getApplicationsRoute, async (c) => {
       candidateId: application.applications.candidateId,
       resume: application.applications.resume ?? "",
       resumeText: application.applications.resumeText ?? "",
-      posterId: application.sq?.posterId ?? null,
+      posterId: application.jobs.posterId ?? null,
     })),
     200,
   );
@@ -213,7 +210,9 @@ app.openapi(nextStageRoute, async (c) => {
   const [application] = await db
     .select()
     .from(applicationsTable)
-    .where(eq(applicationsTable.id, id));
+    .where(
+      and(eq(applicationsTable.id, id), isNull(applicationsTable.deletedAt)),
+    );
 
   if (!application) {
     return c.json(
@@ -311,7 +310,9 @@ app.openapi(rejectApplicationRoute, async (c) => {
   const [application] = await db
     .select()
     .from(applicationsTable)
-    .where(eq(applicationsTable.id, id));
+    .where(
+      and(eq(applicationsTable.id, id), isNull(applicationsTable.deletedAt)),
+    );
 
   if (!application) {
     return c.json(
