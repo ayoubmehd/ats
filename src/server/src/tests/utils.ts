@@ -21,7 +21,8 @@ export async function getOrCreateRecruiter({
   return await db
     .insert(usersTable)
     .values({
-      username: "Recruiter",
+      id: "recruiter-1",
+      name: "Recruiter",
       email,
       role: "recruiter",
     })
@@ -45,7 +46,8 @@ export async function getOrCreateCandidate({
   return await db
     .insert(usersTable)
     .values({
-      username: "Candidate",
+      id: "candidate-1",
+      name: "Candidate",
       email,
       role: "candidate",
     })

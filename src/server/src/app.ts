@@ -6,8 +6,49 @@ import { jobsRouter } from "./routes/jobs.js";
 import { db } from "./db/connection.js";
 import { Scalar } from "@scalar/hono-api-reference";
 import { applicationsRouter } from "./routes/applications.js";
+import { initAuthConfig, verifyAuth, authHandler } from "@hono/auth-js";
+import Google from "@auth/core/providers/google";
+import { DrizzleAdapter } from "@auth/drizzle-adapter";
+import {
+  usersTable,
+  accountsTable,
+  sessionsTable,
+  verificationTokensTable,
+} from "./db/schema.js";
+
+if (!process.env.GOOGLE_ID || !process.env.GOOGLE_SECRET) {
+  throw new Error("GOOGLE_ID and GOOGLE_SECRET must be set");
+}
+
+if (!process.env.AUTH_SECRET) {
+  throw new Error("AUTH_SECRET must be set");
+}
 
 const app = new OpenAPIHono();
+
+app.use(
+  "*",
+  initAuthConfig(() => {
+    return {
+      secret: process.env.AUTH_SECRET!,
+      adapter: DrizzleAdapter(db, {
+        usersTable,
+        accountsTable,
+        sessionsTable,
+        verificationTokensTable,
+      }),
+      providers: [
+        Google({
+          clientId: process.env.GOOGLE_ID!,
+          clientSecret: process.env.GOOGLE_SECRET!,
+        }),
+      ],
+      session: {
+        strategy: "database",
+      },
+    };
+  }),
+);
 
 app.get("/-/db/health", async (c) => {
   try {

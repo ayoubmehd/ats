@@ -4,25 +4,28 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { usersTable as candidatesTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
 import { and, eq, isNull } from "drizzle-orm";
+import { verifyAuth } from "@hono/auth-js";
 
 const app = new OpenAPIHono();
 
+app.use("*", verifyAuth());
+
 const CreateCandidateSchema = z.object({
-  username: z.string().min(1),
+  name: z.string().min(1),
   email: z.email(),
 });
 
 const UpdateCandidateSchema = z.object({
-  username: z.string().min(1),
+  name: z.string().min(1),
   email: z.email(),
 });
 
 const CandidateSchema = z
   .object({
-    id: z.number().openapi({
+    id: z.string().openapi({
       example: "121",
     }),
-    username: z.string().openapi({
+    name: z.string().openapi({
       example: "John Doe",
     }),
     email: z.email().openapi({
@@ -50,7 +53,7 @@ app.openapi(getCandidatesRoute, async (c) => {
   const candidates = await db
     .select({
       id: candidatesTable.id,
-      username: candidatesTable.username,
+      name: candidatesTable.name,
       email: candidatesTable.email,
     })
     .from(candidatesTable)
@@ -64,8 +67,8 @@ export const getCandidateRoute = createRoute({
   path: "/candidates/{id}",
   request: {
     params: z.object({
-      id: z.coerce.number().openapi({
-        example: 121,
+      id: z.string().openapi({
+        example: "121",
       }),
     }),
   },
@@ -96,7 +99,7 @@ app.openapi(getCandidateRoute, async (c) => {
   const [candidate] = await db
     .select({
       id: candidatesTable.id,
-      username: candidatesTable.username,
+      name: candidatesTable.name,
       email: candidatesTable.email,
     })
     .from(candidatesTable)
@@ -148,7 +151,7 @@ export const createCandidateRoute = createRoute({
 });
 
 app.openapi(createCandidateRoute, async (c) => {
-  const { username, email } = await c.req.valid("json");
+  const { name, email } = await c.req.valid("json");
 
   const existingCandidate = await db
     .select()
@@ -166,12 +169,13 @@ app.openapi(createCandidateRoute, async (c) => {
   const [candidate] = await db
     .insert(candidatesTable)
     .values({
-      username,
+      id: crypto.randomUUID().toString(),
+      name,
       email,
     })
     .returning({
       id: candidatesTable.id,
-      username: candidatesTable.username,
+      name: candidatesTable.name,
       email: candidatesTable.email,
     });
 
@@ -183,7 +187,7 @@ export const updateCandidateRoute = createRoute({
   path: "/candidates/{id}",
   request: {
     params: z.object({
-      id: z.coerce.number().openapi({
+      id: z.string().openapi({
         example: 121,
       }),
     }),
@@ -210,11 +214,11 @@ export const updateCandidateRoute = createRoute({
 
 app.openapi(updateCandidateRoute, async (c) => {
   const { id } = c.req.valid("param");
-  const { username, email } = await c.req.valid("json");
+  const { name, email } = await c.req.valid("json");
   const [candidate] = await db
     .update(candidatesTable)
     .set({
-      username,
+      name,
       email,
     })
     .where(and(eq(candidatesTable.id, id), isNull(candidatesTable.deletedAt)))
@@ -222,7 +226,7 @@ app.openapi(updateCandidateRoute, async (c) => {
   return c.json(
     {
       id: candidate.id,
-      username: candidate.username,
+      name: candidate.name,
       email: candidate.email,
     },
     200,
@@ -234,8 +238,8 @@ export const deleteCandidateRoute = createRoute({
   path: "/candidates/{id}",
   request: {
     params: z.object({
-      id: z.coerce.number().openapi({
-        example: 121,
+      id: z.string().openapi({
+        example: "121",
       }),
     }),
   },

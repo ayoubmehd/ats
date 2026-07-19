@@ -7,7 +7,7 @@ import { eq } from "drizzle-orm";
 const client = await pool.connect();
 const db = drizzle(client);
 
-let posterId: number;
+let posterId: string;
 
 beforeAll(async () => {
   const [{ id }] = await db
