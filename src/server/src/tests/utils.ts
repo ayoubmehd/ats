@@ -54,6 +54,7 @@ export async function createSessionCookie(userId: string) {
   return `authjs.session-token=${sessionToken}`;
 }
 
+// TODO: Fix race condition where two recruiters are created with the same email at the same time
 export async function getOrCreateRecruiter({
   email = "recruiter@example.com",
 }: {
@@ -70,7 +71,7 @@ export async function getOrCreateRecruiter({
   return await testDb
     .insert(usersTable)
     .values({
-      id: "recruiter-1",
+      id: randomUUID(),
       name: "Recruiter",
       email,
       role: "recruiter",
@@ -78,7 +79,7 @@ export async function getOrCreateRecruiter({
     .returning()
     .then(([user]) => user);
 }
-
+// TODO: Fix race condition where two candidates are created with the same email at the same time
 export async function getOrCreateCandidate({
   email = "candidate@example.com",
 }: {
@@ -95,7 +96,7 @@ export async function getOrCreateCandidate({
   return await testDb
     .insert(usersTable)
     .values({
-      id: "candidate-1",
+      id: randomUUID(),
       name: "Candidate",
       email,
       role: "candidate",
