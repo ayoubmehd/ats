@@ -282,10 +282,7 @@ app.openapi(nextStageRoute, async (c) => {
     .where(eq(applicationsTable.id, id))
     .returning();
 
-  return c.json(
-    toApplicationResponse(updatedApplication, row.posterId),
-    200,
-  );
+  return c.json(toApplicationResponse(updatedApplication, row.posterId), 200);
 });
 
 const rejectApplicationRoute = createRoute({
@@ -354,10 +351,7 @@ app.openapi(rejectApplicationRoute, async (c) => {
     .where(eq(applicationsTable.id, id))
     .returning();
 
-  return c.json(
-    toApplicationResponse(updatedApplication, row.posterId),
-    200,
-  );
+  return c.json(toApplicationResponse(updatedApplication, row.posterId), 200);
 });
 
 export { app as applicationsRouter };
