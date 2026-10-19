@@ -14,6 +14,7 @@ rejected   rejected     rejected   rejected
 - Every application starts at `applied`.
 - Each stage can only move forward to the next stage, or sideways to `rejected`.
 - `hired` and `rejected` are terminal states (no further transitions).
-- The API enforces these rules in `src/routes/applications.ts` by:
-  - `/next-stage` checking current stage from db and moving to the correct stage.
-  - `/reject` reject application.
+- The API enforces these rules in `src/routes/applications.ts`:
+  - `/next-stage` reads the current stage from the database and moves it one step forward.
+  - `/reject` moves the application to `rejected`.
+  - Both return 400 when the application is already `hired` or `rejected`.
