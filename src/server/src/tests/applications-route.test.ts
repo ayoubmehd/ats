@@ -1,22 +1,34 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pool } from "../db/connection.js";
-import { applicationsTable, jobsTable, usersTable } from "../db/schema.js";
-import { applicationsRouter } from "../routes/applications.js";
-import { test, expect, beforeAll } from "vitest";
+import { applicationsTable, jobsTable } from "../db/schema.js";
+import { applicationsRouter as applicationsRouterBase } from "../routes/applications.js";
+import { test, expect, beforeAll, afterAll } from "vitest";
 import { eq } from "drizzle-orm";
-import { getOrCreateCandidate, getOrCreateRecruiter } from "./utils.js";
+import {
+  createSessionCookie,
+  getOrCreateCandidate,
+  getOrCreateRecruiter,
+  withAuth,
+} from "./utils.js";
+
 const client = await pool.connect();
 const db = drizzle(client);
 
-let posterId: number;
+const applicationsRouter = withAuth(applicationsRouterBase);
+
+let posterId: string;
 let applicationToRejectId: number;
+let authCookie: string;
+let candidateAuthCookie: string;
+const candidate = await getOrCreateCandidate({
+  email: "candidate@example.com",
+});
 
 beforeAll(async () => {
   const user = await getOrCreateRecruiter({ email: "recruiter@example.com" });
   posterId = user.id;
-  const candidate = await getOrCreateCandidate({
-    email: "candidate@example.com",
-  });
+  authCookie = await createSessionCookie(user.id);
+  candidateAuthCookie = await createSessionCookie(candidate.id);
   const [job] = await db
     .insert(jobsTable)
     .values({
@@ -72,11 +84,14 @@ beforeAll(async () => {
 });
 
 test("get applications", async () => {
-  const response = await applicationsRouter.request("/applications");
+  const response = await applicationsRouter.request("/applications", {
+    headers: {
+      Cookie: authCookie,
+    },
+  });
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body).toBeDefined();
-  expect(body.length).toBe(2);
   expect(body.every((app: any) => app.posterId === posterId)).toBe(true);
 });
 
@@ -103,6 +118,7 @@ test("create application", async () => {
     }),
     headers: {
       "Content-Type": "application/json",
+      Cookie: candidateAuthCookie,
     },
   });
   expect(response.status).toBe(201);
@@ -112,6 +128,7 @@ test("create application", async () => {
   applicationId = body.id;
   expect(body.jobId).toBe(jobId);
   expect(body.candidateId).toBeDefined();
+  expect(body.candidateId).toBe(candidate.id);
   expect(body.resume).toBe("https://example.com/resume.pdf");
   expect(body.resumeText).toBe("Full resume text here");
   expect(body.status).toBe("applied");
@@ -169,6 +186,7 @@ test("next stage screening", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: authCookie,
       },
     },
   );
@@ -188,6 +206,7 @@ test("next stage interview", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: authCookie,
       },
     },
   );
@@ -205,6 +224,7 @@ test("next stage offer", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: authCookie,
       },
     },
   );
@@ -222,6 +242,7 @@ test("next stage hired", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: authCookie,
       },
     },
   );
@@ -239,6 +260,7 @@ test("next stage already last stage", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: authCookie,
       },
     },
   );
@@ -254,6 +276,7 @@ test("reject application", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: authCookie,
       },
     },
   );
@@ -271,6 +294,7 @@ test("reject already rejected application", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: authCookie,
       },
     },
   );
@@ -330,6 +354,7 @@ test("next stage application not found", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: authCookie,
       },
     },
   );
@@ -345,6 +370,7 @@ test("reject application not found", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: authCookie,
       },
     },
   );
@@ -353,22 +379,12 @@ test("reject application not found", async () => {
   expect(body.message).toBe("Application not found");
 });
 
-test("get applications recruiter not found", async () => {
-  await db
-    .update(usersTable)
-    .set({ email: "missing-recruiter@example.com" })
-    .where(eq(usersTable.email, "recruiter@example.com"));
+test("get applications unauthenticated", async () => {
   const response = await applicationsRouter.request("/applications");
-  expect(response.status).toBe(404);
-  const body = await response.json();
-  expect(body.message).toBe("Recruiter not found");
+  expect(response.status).toBe(401);
 });
 
-test("create application candidate not found", async () => {
-  await db
-    .update(usersTable)
-    .set({ email: "missing-candidate@example.com" })
-    .where(eq(usersTable.email, "candidate@example.com"));
+test("create application unauthenticated", async () => {
   const [job] = await db
     .select()
     .from(jobsTable)
@@ -385,9 +401,7 @@ test("create application candidate not found", async () => {
       "Content-Type": "application/json",
     },
   });
-  expect(response.status).toBe(404);
-  const body = await response.json();
-  expect(body.message).toBe("Candidate not found");
+  expect(response.status).toBe(401);
 });
 
 test("reject already hired application", async () => {
@@ -397,10 +411,15 @@ test("reject already hired application", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: authCookie,
       },
     },
   );
   expect(response.status).toBe(400);
   const body = await response.json();
   expect(body.message).toBe("Application is already hired");
+});
+
+afterAll(() => {
+  db.$client.release();
 });

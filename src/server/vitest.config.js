@@ -5,7 +5,7 @@ export default defineConfig({
     root: path.resolve(__dirname, "."),
     environment: "node",
     globalSetup: "./globalSetup.ts",
-    // setupFiles: ["./src/tests/vitest.setup.ts"],
+    setupFiles: ["./src/tests/vitest.setup.ts"],
     exclude: ["node_modules", "dist"],
   },
 });

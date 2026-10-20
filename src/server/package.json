@@ -9,9 +9,13 @@
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "db:test-migrate": "DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ats_test drizzle-kit migrate",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {
+    "@auth/core": "^0.34.3",
+    "@auth/drizzle-adapter": "^1.11.2",
+    "@hono/auth-js": "^1.1.1",
     "@hono/node-server": "^2.0.5",
     "@hono/zod-openapi": "^1.4.0",
     "@scalar/hono-api-reference": "^0.11.4",

@@ -4,9 +4,11 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { jobsTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
 import { and, eq, isNull } from "drizzle-orm";
+import { verifyAuth } from "@hono/auth-js";
 
 const app = new OpenAPIHono();
 
+app.use("*", verifyAuth());
 const JobStatusSchema = z.enum(["open", "closed", "draft"]);
 
 const CreateJobSchema = z.object({
@@ -14,7 +16,7 @@ const CreateJobSchema = z.object({
   summary: z.string().optional(),
   content: z.string().optional(),
   status: JobStatusSchema.optional(),
-  posterId: z.number().optional(),
+  posterId: z.string().optional(),
 });
 
 const UpdateJobSchema = z.object({
@@ -22,7 +24,7 @@ const UpdateJobSchema = z.object({
   summary: z.string().optional(),
   content: z.string().optional(),
   status: JobStatusSchema.optional(),
-  posterId: z.number().optional(),
+  posterId: z.string().optional(),
 });
 
 const JobSchema = z
@@ -42,7 +44,7 @@ const JobSchema = z
     status: JobStatusSchema.openapi({
       example: "open",
     }),
-    posterId: z.number().nullable().openapi({
+    posterId: z.string().nullable().openapi({
       example: 1,
     }),
   })

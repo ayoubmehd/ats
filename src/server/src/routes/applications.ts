@@ -4,8 +4,11 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { applicationsTable, jobsTable, usersTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
 import { and, eq, isNull } from "drizzle-orm";
+import { verifyAuth } from "@hono/auth-js";
 
 const app = new OpenAPIHono();
+
+app.use("*", verifyAuth());
 
 const CreateApplicationSchema = z.object({
   jobId: z.number(),
@@ -25,11 +28,11 @@ const ApplicationStatusSchema = z.enum([
 const ApplicationSchema = z.object({
   id: z.number(),
   jobId: z.number().nullable(),
-  candidateId: z.number().nullable(),
+  candidateId: z.string().nullable(),
   resume: z.string(),
   resumeText: z.string(),
   status: ApplicationStatusSchema,
-  posterId: z.number().nullable(),
+  posterId: z.string().nullable(),
 });
 
 const MessageSchema = z.object({
@@ -98,12 +101,8 @@ export const getApplicationsRoute = createRoute({
 });
 
 app.openapi(getApplicationsRoute, async (c) => {
-  // No auth for now, will use hardcoded email for recruiter
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, "recruiter@example.com"));
-  if (!user) {
+  const authUser = c.get("authUser");
+  if (!authUser || !authUser.user?.id) {
     return c.json(
       {
         message: "Recruiter not found",
@@ -117,7 +116,7 @@ app.openapi(getApplicationsRoute, async (c) => {
     .innerJoin(jobsTable, eq(applicationsTable.jobId, jobsTable.id))
     .where(
       and(
-        eq(jobsTable.posterId, user.id),
+        eq(jobsTable.posterId, authUser.user.id),
         isNull(applicationsTable.deletedAt),
         isNull(jobsTable.deletedAt),
       ),
@@ -173,15 +172,9 @@ export const createApplicationRoute = createRoute({
 });
 
 app.openapi(createApplicationRoute, async (c) => {
-  const envVars = process.env;
-
   const { jobId, resume, resumeText } = await c.req.valid("json");
-  // No auth for now, will use hardcoded email for candidate
-  const [user] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, envVars.TEST_EMAIL ?? "jane@example.com"));
-  if (!user) {
+  const authUser = c.get("authUser");
+  if (!authUser || !authUser.user?.id) {
     return c.json(
       {
         message: "Candidate not found",
@@ -215,7 +208,7 @@ app.openapi(createApplicationRoute, async (c) => {
     .insert(applicationsTable)
     .values({
       jobId,
-      candidateId: user.id,
+      candidateId: authUser.user.id,
       resume,
       resumeText,
     })
