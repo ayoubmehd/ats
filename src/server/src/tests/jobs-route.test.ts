@@ -1,13 +1,17 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pool } from "../db/connection.js";
-import { applicationsTable, jobsTable, usersTable } from "../db/schema.js";
-import { jobsRouter } from "../routes/jobs.js";
-import { test, expect, beforeAll, afterAll } from "vitest";
+import { jobsTable, usersTable } from "../db/schema.js";
+import { jobsRouter as jobsRouterBase } from "../routes/jobs.js";
+import { test, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
+import { createSessionCookie, withAuth } from "./utils.js";
 const client = await pool.connect();
 const db = drizzle(client);
 
-let posterId: number;
+const jobsRouter = withAuth(jobsRouterBase);
+
+let posterId: string;
+let authCookie: string;
 
 beforeAll(async () => {
   const [{ id }] = await db
@@ -16,6 +20,7 @@ beforeAll(async () => {
     .where(eq(usersTable.email, "recruiter@example.com"))
     .limit(1);
   posterId = id;
+  authCookie = await createSessionCookie(posterId);
   await db.insert(jobsTable).values({
     title: "Software Engineer",
     summary: "A great opportunity",
@@ -26,7 +31,11 @@ beforeAll(async () => {
 });
 
 test("get jobs", async () => {
-  const response = await jobsRouter.request("/jobs");
+  const response = await jobsRouter.request("/jobs", {
+    headers: {
+      Cookie: authCookie,
+    },
+  });
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body).toBeDefined();
@@ -48,6 +57,7 @@ test("create job", async () => {
     }),
     headers: {
       "Content-Type": "application/json",
+      Cookie: authCookie,
     },
   });
   expect(response.status).toBe(201);
@@ -63,7 +73,11 @@ test("create job", async () => {
 });
 
 test("get job", async () => {
-  const response = await jobsRouter.request(`/jobs/${lastJobId}`);
+  const response = await jobsRouter.request(`/jobs/${lastJobId}`, {
+    headers: {
+      Cookie: authCookie,
+    },
+  });
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body).toBeDefined();
@@ -87,6 +101,7 @@ test("update job", async () => {
     }),
     headers: {
       "Content-Type": "application/json",
+      Cookie: authCookie,
     },
   });
   expect(response.status).toBe(200);
@@ -103,6 +118,9 @@ test("update job", async () => {
 test("delete job", async () => {
   const response = await jobsRouter.request(`/jobs/${lastJobId}`, {
     method: "DELETE",
+    headers: {
+      Cookie: authCookie,
+    },
   });
   expect(response.status).toBe(200);
   const body = await response.json();
@@ -111,7 +129,11 @@ test("delete job", async () => {
 });
 
 test("get deleted job", async () => {
-  const response = await jobsRouter.request(`/jobs/${lastJobId}`);
+  const response = await jobsRouter.request(`/jobs/${lastJobId}`, {
+    headers: {
+      Cookie: authCookie,
+    },
+  });
   expect(response.status).toBe(404);
   const body = await response.json();
   expect(body).toBeDefined();
