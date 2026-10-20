@@ -50,7 +50,7 @@ type Application = typeof applicationsTable.$inferSelect;
 
 function toApplicationResponse(
   application: Application,
-  posterId: number | null,
+  posterId: string | null,
 ) {
   return {
     id: application.id,

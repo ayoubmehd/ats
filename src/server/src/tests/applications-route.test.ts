@@ -18,7 +18,7 @@ const applicationsRouter = withAuth(applicationsRouterBase);
 
 let posterId: string;
 let applicationToRejectId: number;
-let authCookie: string;
+let userAuthCookie: string;
 let candidateAuthCookie: string;
 const candidate = await getOrCreateCandidate({
   email: "candidate@example.com",
@@ -27,7 +27,7 @@ const candidate = await getOrCreateCandidate({
 beforeAll(async () => {
   const user = await getOrCreateRecruiter({ email: "recruiter@example.com" });
   posterId = user.id;
-  authCookie = await createSessionCookie(user.id);
+  userAuthCookie = await createSessionCookie(user.id);
   candidateAuthCookie = await createSessionCookie(candidate.id);
   const [job] = await db
     .insert(jobsTable)
@@ -86,7 +86,7 @@ beforeAll(async () => {
 test("get applications", async () => {
   const response = await applicationsRouter.request("/applications", {
     headers: {
-      Cookie: authCookie,
+      Cookie: userAuthCookie,
     },
   });
   expect(response.status).toBe(200);
@@ -145,6 +145,7 @@ test("create application job not found", async () => {
     }),
     headers: {
       "Content-Type": "application/json",
+      Cookie: candidateAuthCookie,
     },
   });
   expect(response.status).toBe(404);
@@ -172,6 +173,7 @@ test("create application job not open", async () => {
     }),
     headers: {
       "Content-Type": "application/json",
+      Cookie: candidateAuthCookie,
     },
   });
   expect(response.status).toBe(400);
@@ -186,7 +188,7 @@ test("next stage screening", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -206,7 +208,7 @@ test("next stage interview", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -224,7 +226,7 @@ test("next stage offer", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -242,7 +244,7 @@ test("next stage hired", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -260,7 +262,7 @@ test("next stage already last stage", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -276,7 +278,7 @@ test("reject application", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -294,7 +296,7 @@ test("reject already rejected application", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -310,6 +312,7 @@ test("next stage rejected application", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -340,7 +343,11 @@ test("get applications excludes soft-deleted jobs", async () => {
     resumeText: "Full resume text here",
     status: "applied",
   });
-  const response = await applicationsRouter.request("/applications");
+  const response = await applicationsRouter.request("/applications", {
+    headers: {
+      Cookie: userAuthCookie,
+    },
+  });
   expect(response.status).toBe(200);
   const body = await response.json();
   expect(body.length).toBeGreaterThan(0);
@@ -354,7 +361,7 @@ test("next stage application not found", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -370,7 +377,7 @@ test("reject application not found", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -411,7 +418,7 @@ test("reject already hired application", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
