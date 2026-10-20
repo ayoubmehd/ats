@@ -96,7 +96,7 @@ flowchart TB
     end
 
     subgraph Candidates
-        C1["GET /candidates"]
+        C1["GET /candidates, GET /candidates/:id"]
         C2["POST /candidates"]
         C3["PUT /candidates/:id"]
         C4["DELETE /candidates/:id"]
@@ -118,7 +118,7 @@ flowchart TB
     REC["recruiter"] -->|"scope: own + open"| J1
     REC -->|"posterId = self"| J2
     REC -->|"scope: own"| J3 & J4
-    REC -->|"scope: global"| C1 & C2 & C3 & C4
+    REC -->|"scope: global (read only)"| C1
     REC -->|"scope: own_jobs"| A1 & A3 & A4
 
     CAND["candidate"] -->|"scope: open_only"| J1
@@ -144,9 +144,9 @@ flowchart TB
 |------------|-------|-----------|-----------|
 | `GET /candidates` (list) | ✓ | ✓ | ✗ |
 | `GET /candidates/:id` (read) | ✓ | ✓ | ✗ |
-| `POST /candidates` (create) | ✓ | ✓ | ✗ |
-| `PUT /candidates/:id` (update) | ✓ | ✓ | ✗ |
-| `DELETE /candidates/:id` (delete) | ✓ | ✓ | ✗ |
+| `POST /candidates` (create) | ✓ | ✗ | ✗ |
+| `PUT /candidates/:id` (update) | ✓ | ✗ | ✗ |
+| `DELETE /candidates/:id` (delete) | ✓ | ✗ | ✗ |
 
 ### Applications
 
@@ -175,6 +175,7 @@ flowchart LR
 | Public access | `GET /jobs` and `GET /jobs/:id` for `status = open` only |
 | Auth required | All other routes |
 | Job create ownership | Recruiter: `posterId` auto-set to self (body value ignored); Admin: may set any `posterId` |
+| Candidate management | Recruiter: read only (`GET`); Admin: full CRUD |
 | Authz failure | `403 Forbidden` |
 | Missing resource | `404 Not Found` (only when truly absent or soft-deleted) |
 
@@ -186,6 +187,9 @@ flowchart LR
   own listings; admins retain global access.
 - **Candidates can list/view other candidates** — rejected; candidate PII is visible to
   recruiters and admins only.
+- **Recruiters can create/update/delete candidates** — rejected; candidate accounts are
+  user records, so mutations are an admin concern; recruiters only need read access to
+  evaluate applicants.
 - **404 for ownership failures** — rejected; `403 Forbidden` is clearer for API clients
   when the resource exists but the user lacks access.
 - **Client-supplied `posterId` for recruiters** — rejected; auto-assign from session to
@@ -199,5 +203,7 @@ flowchart LR
 - On `POST /jobs`, set `posterId` from session for recruiters; allow admin override.
 - On `POST /applications`, validate `job.status = open` before accepting.
 - Scope `GET /applications` by role: admin (all), recruiter (own jobs), candidate (own apps).
+- Candidate writes (`POST`/`PUT`/`DELETE /candidates`) are admin-only; recruiters can read
+  candidates but get `403` on writes.
 - Return `403` for authorization failures; reserve `404` for missing or soft-deleted resources.
 - Extend route tests (ADR 0002) with session cookies per role and assert 401/403/404 behavior.
