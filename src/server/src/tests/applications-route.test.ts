@@ -18,7 +18,7 @@ const applicationsRouter = withAuth(applicationsRouterBase);
 
 let posterId: string;
 let applicationToRejectId: number;
-let authCookie: string;
+let userAuthCookie: string;
 let candidateAuthCookie: string;
 const candidate = await getOrCreateCandidate({
   email: "candidate@example.com",
@@ -27,7 +27,7 @@ const candidate = await getOrCreateCandidate({
 beforeAll(async () => {
   const user = await getOrCreateRecruiter({ email: "recruiter@example.com" });
   posterId = user.id;
-  authCookie = await createSessionCookie(user.id);
+  userAuthCookie = await createSessionCookie(user.id);
   candidateAuthCookie = await createSessionCookie(candidate.id);
   const [job] = await db
     .insert(jobsTable)
@@ -86,7 +86,7 @@ beforeAll(async () => {
 test("get applications", async () => {
   const response = await applicationsRouter.request("/applications", {
     headers: {
-      Cookie: authCookie,
+      Cookie: userAuthCookie,
     },
   });
   expect(response.status).toBe(200);
@@ -121,7 +121,7 @@ test("create application", async () => {
       Cookie: candidateAuthCookie,
     },
   });
-  expect(response.status).toBe(200);
+  expect(response.status).toBe(201);
   const body = await response.json();
   expect(body).toBeDefined();
   expect(body.id).toBeDefined();
@@ -131,6 +131,54 @@ test("create application", async () => {
   expect(body.candidateId).toBe(candidate.id);
   expect(body.resume).toBe("https://example.com/resume.pdf");
   expect(body.resumeText).toBe("Full resume text here");
+  expect(body.status).toBe("applied");
+  expect(body.posterId).toBe(posterId);
+});
+
+test("create application job not found", async () => {
+  const response = await applicationsRouter.request("/applications", {
+    method: "POST",
+    body: JSON.stringify({
+      jobId: 999999,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Full resume text here",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: candidateAuthCookie,
+    },
+  });
+  expect(response.status).toBe(404);
+  const body = await response.json();
+  expect(body.message).toBe("Job not found");
+});
+
+test("create application job not open", async () => {
+  const [closedJob] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Closed Role",
+      summary: "A great opportunity",
+      content: "Full job description here",
+      status: "closed",
+      posterId: posterId,
+    })
+    .returning();
+  const response = await applicationsRouter.request("/applications", {
+    method: "POST",
+    body: JSON.stringify({
+      jobId: closedJob.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Full resume text here",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: candidateAuthCookie,
+    },
+  });
+  expect(response.status).toBe(400);
+  const body = await response.json();
+  expect(body.message).toBe("Job is not open for applications");
 });
 
 test("next stage screening", async () => {
@@ -140,7 +188,7 @@ test("next stage screening", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -150,6 +198,7 @@ test("next stage screening", async () => {
   expect(body).toBeDefined();
   expect(body.id).toBe(applicationId);
   expect(body.status).toBe("screening");
+  expect(body.posterId).toBe(posterId);
 });
 
 test("next stage interview", async () => {
@@ -159,7 +208,7 @@ test("next stage interview", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -177,7 +226,7 @@ test("next stage offer", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -195,7 +244,7 @@ test("next stage hired", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -213,13 +262,13 @@ test("next stage already last stage", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
   expect(response.status).toBe(400);
   const body = await response.json();
-  expect(body.message).toBe("Application is already in the last stage");
+  expect(body.message).toBe("Application is already hired");
 });
 
 test("reject application", async () => {
@@ -229,7 +278,7 @@ test("reject application", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -247,13 +296,62 @@ test("reject already rejected application", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
   expect(response.status).toBe(400);
   const body = await response.json();
   expect(body.message).toBe("Application is already rejected");
+});
+
+test("next stage rejected application", async () => {
+  const response = await applicationsRouter.request(
+    `/applications/${applicationToRejectId}/next-stage`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Cookie: userAuthCookie,
+      },
+    },
+  );
+  expect(response.status).toBe(400);
+  const body = await response.json();
+  expect(body.message).toBe("Application is already rejected");
+});
+
+test("get applications excludes soft-deleted jobs", async () => {
+  const candidate = await getOrCreateCandidate({
+    email: "candidate.2@example.com",
+  });
+  const [deletedJob] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Deleted Role",
+      summary: "A great opportunity",
+      content: "Full job description here",
+      status: "open",
+      posterId: posterId,
+      deletedAt: new Date(),
+    })
+    .returning();
+  await db.insert(applicationsTable).values({
+    jobId: deletedJob.id,
+    candidateId: candidate.id,
+    resume: "https://example.com/resume.pdf",
+    resumeText: "Full resume text here",
+    status: "applied",
+  });
+  const response = await applicationsRouter.request("/applications", {
+    headers: {
+      Cookie: userAuthCookie,
+    },
+  });
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.length).toBeGreaterThan(0);
+  expect(body.some((app: any) => app.jobId === deletedJob.id)).toBe(false);
 });
 
 test("next stage application not found", async () => {
@@ -263,7 +361,7 @@ test("next stage application not found", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -279,7 +377,7 @@ test("reject application not found", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );
@@ -320,7 +418,7 @@ test("reject already hired application", async () => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        Cookie: authCookie,
+        Cookie: userAuthCookie,
       },
     },
   );

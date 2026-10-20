@@ -16,14 +16,66 @@ const CreateApplicationSchema = z.object({
   resumeText: z.string(),
 });
 
+const ApplicationStatusSchema = z.enum([
+  "applied",
+  "screening",
+  "interview",
+  "offer",
+  "hired",
+  "rejected",
+]);
+
 const ApplicationSchema = z.object({
   id: z.number(),
   jobId: z.number().nullable(),
   candidateId: z.string().nullable(),
   resume: z.string(),
   resumeText: z.string(),
+  status: ApplicationStatusSchema,
   posterId: z.string().nullable(),
 });
+
+const MessageSchema = z.object({
+  message: z.string(),
+});
+
+const NEXT_STAGE = {
+  applied: "screening",
+  screening: "interview",
+  interview: "offer",
+  offer: "hired",
+} as const;
+
+type Application = typeof applicationsTable.$inferSelect;
+
+function toApplicationResponse(
+  application: Application,
+  posterId: string | null,
+) {
+  return {
+    id: application.id,
+    jobId: application.jobId,
+    candidateId: application.candidateId,
+    resume: application.resume ?? "",
+    resumeText: application.resumeText ?? "",
+    status: application.status,
+    posterId,
+  };
+}
+
+async function findApplicationWithPoster(id: number) {
+  const [row] = await db
+    .select({
+      application: applicationsTable,
+      posterId: jobsTable.posterId,
+    })
+    .from(applicationsTable)
+    .leftJoin(jobsTable, eq(applicationsTable.jobId, jobsTable.id))
+    .where(
+      and(eq(applicationsTable.id, id), isNull(applicationsTable.deletedAt)),
+    );
+  return row;
+}
 
 export const getApplicationsRoute = createRoute({
   method: "get",
@@ -35,14 +87,12 @@ export const getApplicationsRoute = createRoute({
           schema: z.array(ApplicationSchema),
         },
       },
-      description: "Get all applications for current logged inrecruiter",
+      description: "Get all applications for current logged in recruiter",
     },
     404: {
       content: {
         "application/json": {
-          schema: z.object({
-            message: z.string(),
-          }),
+          schema: MessageSchema,
         },
       },
       description: "Recruiter not found",
@@ -68,18 +118,14 @@ app.openapi(getApplicationsRoute, async (c) => {
       and(
         eq(jobsTable.posterId, authUser.user.id),
         isNull(applicationsTable.deletedAt),
+        isNull(jobsTable.deletedAt),
       ),
     );
 
   return c.json(
-    result.map((application) => ({
-      id: application.applications.id,
-      jobId: application.applications.jobId,
-      candidateId: application.applications.candidateId,
-      resume: application.applications.resume ?? "",
-      resumeText: application.applications.resumeText ?? "",
-      posterId: application.jobs.posterId ?? null,
-    })),
+    result.map(({ applications, jobs }) =>
+      toApplicationResponse(applications, jobs.posterId),
+    ),
     200,
   );
 });
@@ -98,7 +144,7 @@ export const createApplicationRoute = createRoute({
     },
   },
   responses: {
-    200: {
+    201: {
       content: {
         "application/json": {
           schema: ApplicationSchema,
@@ -106,27 +152,24 @@ export const createApplicationRoute = createRoute({
       },
       description: "Create a new application",
     },
+    400: {
+      content: {
+        "application/json": {
+          schema: MessageSchema,
+        },
+      },
+      description: "Job is not open for applications",
+    },
     404: {
       content: {
         "application/json": {
-          schema: z.object({
-            message: z.string(),
-          }),
+          schema: MessageSchema,
         },
       },
-      description: "Candidate not found",
+      description: "Candidate or job not found",
     },
   },
 });
-
-const VALID_TRANSITIONS = {
-  applied: "screening",
-  screening: "interview",
-  interview: "offer",
-  offer: "hired",
-  rejected: "rejected",
-  hired: "hired",
-} as const;
 
 app.openapi(createApplicationRoute, async (c) => {
   const { jobId, resume, resumeText } = await c.req.valid("json");
@@ -139,6 +182,28 @@ app.openapi(createApplicationRoute, async (c) => {
       404,
     );
   }
+
+  const [job] = await db
+    .select()
+    .from(jobsTable)
+    .where(and(eq(jobsTable.id, jobId), isNull(jobsTable.deletedAt)));
+  if (!job) {
+    return c.json(
+      {
+        message: "Job not found",
+      },
+      404,
+    );
+  }
+  if (job.status !== "open") {
+    return c.json(
+      {
+        message: "Job is not open for applications",
+      },
+      400,
+    );
+  }
+
   const [application] = await db
     .insert(applicationsTable)
     .values({
@@ -148,17 +213,7 @@ app.openapi(createApplicationRoute, async (c) => {
       resumeText,
     })
     .returning();
-  return c.json(
-    {
-      id: application.id,
-      jobId: application.jobId,
-      candidateId: application.candidateId,
-      resume: application.resume ?? "",
-      resumeText: application.resumeText ?? "",
-      posterId: null,
-    },
-    200,
-  );
+  return c.json(toApplicationResponse(application, job.posterId), 201);
 });
 
 const nextStageRoute = createRoute({
@@ -181,9 +236,7 @@ const nextStageRoute = createRoute({
     404: {
       content: {
         "application/json": {
-          schema: z.object({
-            message: z.string(),
-          }),
+          schema: MessageSchema,
         },
       },
       description: "Application not found",
@@ -191,26 +244,19 @@ const nextStageRoute = createRoute({
     400: {
       content: {
         "application/json": {
-          schema: z.object({
-            message: z.string(),
-          }),
+          schema: MessageSchema,
         },
       },
-      description: "Application is already in the last stage",
+      description: "Application is already hired or rejected",
     },
   },
 });
 
 app.openapi(nextStageRoute, async (c) => {
   const { id } = c.req.valid("param");
-  const [application] = await db
-    .select()
-    .from(applicationsTable)
-    .where(
-      and(eq(applicationsTable.id, id), isNull(applicationsTable.deletedAt)),
-    );
+  const row = await findApplicationWithPoster(id);
 
-  if (!application) {
+  if (!row) {
     return c.json(
       {
         message: "Application not found",
@@ -219,23 +265,12 @@ app.openapi(nextStageRoute, async (c) => {
     );
   }
 
-  const currentStage = application.status;
+  const currentStage = row.application.status;
 
-  if (!application) {
+  if (currentStage === "hired" || currentStage === "rejected") {
     return c.json(
       {
-        message: "Application not found",
-      },
-      404,
-    );
-  }
-
-  const nextStage = VALID_TRANSITIONS[currentStage] ?? currentStage;
-
-  if (nextStage === "hired" && currentStage === "hired") {
-    return c.json(
-      {
-        message: "Application is already in the last stage",
+        message: `Application is already ${currentStage}`,
       },
       400,
     );
@@ -243,22 +278,11 @@ app.openapi(nextStageRoute, async (c) => {
 
   const [updatedApplication] = await db
     .update(applicationsTable)
-    .set({ status: nextStage })
+    .set({ status: NEXT_STAGE[currentStage] })
     .where(eq(applicationsTable.id, id))
     .returning();
 
-  return c.json(
-    {
-      id: updatedApplication.id,
-      jobId: updatedApplication.jobId,
-      candidateId: updatedApplication.candidateId,
-      resume: updatedApplication.resume ?? "",
-      resumeText: updatedApplication.resumeText ?? "",
-      status: updatedApplication.status,
-      posterId: null,
-    },
-    200,
-  );
+  return c.json(toApplicationResponse(updatedApplication, row.posterId), 200);
 });
 
 const rejectApplicationRoute = createRoute({
@@ -281,9 +305,7 @@ const rejectApplicationRoute = createRoute({
     404: {
       content: {
         "application/json": {
-          schema: z.object({
-            message: z.string(),
-          }),
+          schema: MessageSchema,
         },
       },
       description: "Application not found",
@@ -291,26 +313,19 @@ const rejectApplicationRoute = createRoute({
     400: {
       content: {
         "application/json": {
-          schema: z.object({
-            message: z.string(),
-          }),
+          schema: MessageSchema,
         },
       },
-      description: "Application is already rejected",
+      description: "Application is already hired or rejected",
     },
   },
 });
 
 app.openapi(rejectApplicationRoute, async (c) => {
   const { id } = c.req.valid("param");
-  const [application] = await db
-    .select()
-    .from(applicationsTable)
-    .where(
-      and(eq(applicationsTable.id, id), isNull(applicationsTable.deletedAt)),
-    );
+  const row = await findApplicationWithPoster(id);
 
-  if (!application) {
+  if (!row) {
     return c.json(
       {
         message: "Application not found",
@@ -319,19 +334,12 @@ app.openapi(rejectApplicationRoute, async (c) => {
     );
   }
 
-  if (application.status === "rejected") {
-    return c.json(
-      {
-        message: "Application is already rejected",
-      },
-      400,
-    );
-  }
+  const currentStage = row.application.status;
 
-  if (application.status === "hired") {
+  if (currentStage === "hired" || currentStage === "rejected") {
     return c.json(
       {
-        message: "Application is already hired",
+        message: `Application is already ${currentStage}`,
       },
       400,
     );
@@ -343,18 +351,7 @@ app.openapi(rejectApplicationRoute, async (c) => {
     .where(eq(applicationsTable.id, id))
     .returning();
 
-  return c.json(
-    {
-      id: updatedApplication.id,
-      jobId: updatedApplication.jobId,
-      candidateId: updatedApplication.candidateId,
-      resume: updatedApplication.resume ?? "",
-      resumeText: updatedApplication.resumeText ?? "",
-      status: updatedApplication.status,
-      posterId: null,
-    },
-    200,
-  );
+  return c.json(toApplicationResponse(updatedApplication, row.posterId), 200);
 });
 
 export { app as applicationsRouter };
