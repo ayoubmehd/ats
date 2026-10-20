@@ -9,6 +9,7 @@ import { verifyAuth } from "@hono/auth-js";
 const app = new OpenAPIHono();
 
 app.use("*", verifyAuth());
+
 const JobStatusSchema = z.enum(["open", "closed", "draft"]);
 
 const CreateJobSchema = z.object({
