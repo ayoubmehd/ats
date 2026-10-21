@@ -51,7 +51,7 @@ export function createApp() {
     }),
   );
 
-  app.use("auth/*", authHandler());
+  app.use("/auth/*", authHandler());
 
   app.get("/-/db/health", async (c) => {
     try {
