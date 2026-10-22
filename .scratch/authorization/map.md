@@ -27,11 +27,12 @@ Tracker: local markdown in `.scratch/authorization/`. A ticket is a child when i
 
 - [How job reads tell anonymous callers from signed-in roles](issues/01-job-reads-anonymous-and-signed-in.md): one jobs router; `optionalAuth` only on `GET /jobs` and `GET /jobs/:id` (`getAuthUser`, set `authUser` or leave it unset); every other route keeps `verifyAuth()`.
 - [Which users a candidate list returns](issues/02-which-users-candidate-list-returns.md): list and read-by-id return only Users with role candidate; a recruiter or admin id is 404.
+- [Which applications stay visible across job status and soft delete](issues/03-application-visibility-by-job-state.md): closed and draft Jobs stay in the list inside role scope; a soft-deleted Job stays visible only to an admin, who may still advance or reject, while a recruiter gets 404.
 
 ## Not yet specified
 
-- The authorization module's interface. Routes need one place that turns a caller, an action, and a resource into allow, 403, or 404, including ownership (`posterId`, `candidateId`). Who loads the Job or Application, and what a filtered list returns, depends on which Applications stay visible and what a soft-deleted caller is.
-- Which new route-test cases the matrix requires. ADR 0004 asks for a session cookie per role and 401/403/404 assertions, and ADR 0002 says to grill before widening test scope. The case list still depends on which Applications stay visible, what a soft-deleted caller is, what 401 and 403 responses look like, and what an admin write does when the User is not a Candidate.
+- The authorization module's interface. Routes need one place that turns a caller, an action, and a resource into allow, 403, or 404, including ownership (`posterId`, `candidateId`). Who loads the Job or Application still depends on what a soft-deleted caller is. Which Applications a filtered list returns is decided.
+- Which new route-test cases the matrix requires. ADR 0004 asks for a session cookie per role and 401/403/404 assertions, and ADR 0002 says to grill before widening test scope. The case list still depends on what a soft-deleted caller is, what 401 and 403 responses look like, and what an admin write does when the User is not a Candidate. Which Applications stay visible is decided.
 
 ## Out of scope
 
