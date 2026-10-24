@@ -29,6 +29,7 @@ Tracker: local markdown in `.scratch/authorization/`. A ticket is a child when i
 - [Which users a candidate list returns](issues/02-which-users-candidate-list-returns.md): list and read-by-id return only Users with role candidate; a recruiter or admin id is 404.
 - [Which applications stay visible across job status and soft delete](issues/03-application-visibility-by-job-state.md): closed and draft Jobs stay in the list inside role scope; a soft-deleted Job stays visible only to an admin, who may still advance or reject, while a recruiter gets 404.
 - [What a valid session means after the user is soft-deleted](issues/04-session-after-user-soft-deleted.md): a soft-deleted User no longer establishes an active identity; required routes return 401, while public Job reads apply anonymous open-only scope.
+- [What 401 and 403 responses look like](issues/05-401-and-403-response-shape.md): 401 `{ message: "Unauthorized" }` for a missing session and a soft-deleted caller; 403 `{ message: "Forbidden" }` for both role and ownership failures.
 
 ## Not yet specified
 
