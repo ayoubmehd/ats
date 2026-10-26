@@ -31,6 +31,7 @@ Tracker: local markdown in `.scratch/authorization/`. A ticket is a child when i
 - [What a valid session means after the user is soft-deleted](issues/04-session-after-user-soft-deleted.md): a soft-deleted User no longer establishes an active identity; required routes return 401, while public Job reads apply anonymous open-only scope.
 - [What 401 and 403 responses look like](issues/05-401-and-403-response-shape.md): 401 `{ message: "Unauthorized" }` for a missing session and a soft-deleted caller; 403 `{ message: "Forbidden" }` for both role and ownership failures.
 - [What an admin write does when the user is not a candidate](issues/06-admin-write-when-user-is-not-a-candidate.md): PUT and DELETE on a live recruiter or admin are 404 and leave that User unchanged; POST restores a soft-deleted Candidate with that email, and returns 400 when the email belongs to anyone else; PUT of a live Candidate returns that same 400 when the new email is taken.
+- [What interface the authorization module exposes](issues/07-authorization-module-interface.md): `resolveCaller` turns the session into an active User or an anonymous caller; the route loads the row; `decide` returns allow with a scope tag or a poster source, or unauthorized, forbidden, or not_found with a message; the route writes HTTP.
 
 ## Not yet specified
 
