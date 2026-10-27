@@ -32,6 +32,7 @@ Tracker: local markdown in `.scratch/authorization/`. A ticket is a child when i
 - [What 401 and 403 responses look like](issues/05-401-and-403-response-shape.md): 401 `{ message: "Unauthorized" }` for a missing session and a soft-deleted caller; 403 `{ message: "Forbidden" }` for both role and ownership failures.
 - [What an admin write does when the user is not a candidate](issues/06-admin-write-when-user-is-not-a-candidate.md): PUT and DELETE on a live recruiter or admin are 404 and leave that User unchanged; POST restores a soft-deleted Candidate with that email, and returns 400 when the email belongs to anyone else; PUT of a live Candidate returns that same 400 when the new email is taken.
 - [What interface the authorization module exposes](issues/07-authorization-module-interface.md): `resolveCaller` turns the session into an active User or an anonymous caller; the route loads the row; `decide` returns allow with a scope tag or a poster source, or unauthorized, forbidden, or not_found with a message; the route writes HTTP.
+- [Which route tests prove the authorization matrix](issues/08-authorization-route-test-matrix.md): only the gaps in the current tests, with each router proving every distinct outcome once and each allow scope checked by list membership; the GET /jobs no-cookie 401 test is removed, and the recruiter Candidate write tests switch to an admin.
 
 ## Not yet specified
 

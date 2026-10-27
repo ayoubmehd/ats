@@ -28,4 +28,4 @@ Every other jobs route still uses `verifyAuth()`, which 401s on that same null. 
 
 A valid session whose User is soft-deleted is still stored as `authUser`. What that caller may do is [What a valid session means after the user is soft-deleted](04-session-after-user-soft-deleted.md).
 
-The existing auth test that expects `GET /jobs` with no cookie to return 401 will no longer match. Which cases to assert stays unspecified on the map.
+The existing auth test that expects `GET /jobs` with no cookie to return 401 will no longer match. [Which route tests prove the authorization matrix](08-authorization-route-test-matrix.md) removes it and decides the cases that replace it.
