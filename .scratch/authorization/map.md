@@ -2,7 +2,7 @@
 title: Enforce ADR 0004 authorization
 labels:
   - wayfinder:map
-status: open
+status: closed
 ---
 
 ## Destination
