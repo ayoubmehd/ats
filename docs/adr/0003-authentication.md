@@ -51,7 +51,8 @@ auth model.
   - `GET /applications` — recruiter or admin; scoped to jobs where `posterId` matches the user
   - `POST /applications` — authenticated candidate; `candidateId` set from session, not body
   - `POST /applications/:id/next-stage` and `/reject` — recruiter who owns the job
-  - `GET /candidates` — recruiter or admin only
+  - `GET /candidates`, `GET /candidates/:id` — recruiter or admin only
+  - Candidate mutations (`POST`/`PUT`/`DELETE /candidates`) — admin only
   - Job mutations — recruiter (own jobs) or admin
 - Route tests need a session helper (sign-in + forward cookie) or middleware injection;
   extend the server-first testing approach from ADR 0002.

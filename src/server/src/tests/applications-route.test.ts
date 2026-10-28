@@ -8,6 +8,7 @@ import {
   createSessionCookie,
   getOrCreateCandidate,
   getOrCreateRecruiter,
+  getOrCreateUser,
   withAuth,
 } from "./utils.js";
 
@@ -389,6 +390,7 @@ test("reject application not found", async () => {
 test("get applications unauthenticated", async () => {
   const response = await applicationsRouter.request("/applications");
   expect(response.status).toBe(401);
+  expect(await response.json()).toEqual({ message: "Unauthorized" });
 });
 
 test("create application unauthenticated", async () => {
@@ -425,6 +427,424 @@ test("reject already hired application", async () => {
   expect(response.status).toBe(400);
   const body = await response.json();
   expect(body.message).toBe("Application is already hired");
+});
+
+test("candidate application list is their apps on live jobs", async () => {
+  const recruiter = await getOrCreateRecruiter({
+    email: "app-list-recruiter@example.com",
+  });
+  const otherCandidate = await getOrCreateCandidate({
+    email: "app-list-other@example.com",
+  });
+  const [liveJob] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Live role",
+      status: "open",
+      posterId: recruiter.id,
+    })
+    .returning();
+  const [deletedJob] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Removed role",
+      status: "open",
+      posterId: recruiter.id,
+      deletedAt: new Date(),
+    })
+    .returning();
+  const [ownApplication] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: liveJob.id,
+      candidateId: candidate.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+      status: "applied",
+    })
+    .returning();
+  const [otherApplication] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: liveJob.id,
+      candidateId: otherCandidate.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+      status: "applied",
+    })
+    .returning();
+  const [deletedJobApplication] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: deletedJob.id,
+      candidateId: candidate.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+      status: "applied",
+    })
+    .returning();
+  const response = await applicationsRouter.request("/applications", {
+    headers: { Cookie: candidateAuthCookie },
+  });
+  expect(response.status).toBe(200);
+  const body: { id: number }[] = await response.json();
+  const ids = body.map((row) => row.id);
+  expect(ids).toContain(ownApplication.id);
+  expect(ids).not.toContain(otherApplication.id);
+  expect(ids).not.toContain(deletedJobApplication.id);
+});
+
+test("admin application list includes every live application", async () => {
+  const first = await getOrCreateRecruiter({
+    email: "admin-apps-one@example.com",
+  });
+  const second = await getOrCreateRecruiter({
+    email: "admin-apps-two@example.com",
+  });
+  const applicant = await getOrCreateCandidate({
+    email: "admin-apps-candidate@example.com",
+  });
+  const admin = await getOrCreateUser({
+    email: "applications-admin@example.com",
+    name: "Applications Admin",
+    role: "admin",
+  });
+  const [openJob] = await db
+    .insert(jobsTable)
+    .values({ title: "First open", status: "open", posterId: first.id })
+    .returning();
+  const [otherOpen] = await db
+    .insert(jobsTable)
+    .values({ title: "Second open", status: "open", posterId: second.id })
+    .returning();
+  const [closedJob] = await db
+    .insert(jobsTable)
+    .values({ title: "Closed", status: "closed", posterId: first.id })
+    .returning();
+  const [deletedJob] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Deleted",
+      status: "open",
+      posterId: first.id,
+      deletedAt: new Date(),
+    })
+    .returning();
+  const inserted = await db
+    .insert(applicationsTable)
+    .values([
+      {
+        jobId: openJob.id,
+        candidateId: applicant.id,
+        resume: "https://example.com/resume.pdf",
+        resumeText: "Resume",
+      },
+      {
+        jobId: otherOpen.id,
+        candidateId: applicant.id,
+        resume: "https://example.com/resume.pdf",
+        resumeText: "Resume",
+      },
+      {
+        jobId: closedJob.id,
+        candidateId: applicant.id,
+        resume: "https://example.com/resume.pdf",
+        resumeText: "Resume",
+      },
+      {
+        jobId: deletedJob.id,
+        candidateId: applicant.id,
+        resume: "https://example.com/resume.pdf",
+        resumeText: "Resume",
+      },
+    ])
+    .returning();
+  const cookie = await createSessionCookie(admin.id);
+  const response = await applicationsRouter.request("/applications", {
+    headers: { Cookie: cookie },
+  });
+  expect(response.status).toBe(200);
+  const body: { id: number }[] = await response.json();
+  const ids = body.map((row) => row.id);
+  for (const application of inserted) {
+    expect(ids).toContain(application.id);
+  }
+});
+
+test("recruiter application list keeps closed and draft jobs", async () => {
+  const [closedJob] = await db
+    .insert(jobsTable)
+    .values({ title: "Own closed", status: "closed", posterId })
+    .returning();
+  const [draftJob] = await db
+    .insert(jobsTable)
+    .values({ title: "Own draft", status: "draft", posterId })
+    .returning();
+  const applicant = await getOrCreateCandidate({
+    email: "status-apps-candidate@example.com",
+  });
+  const [closedApplication] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: closedJob.id,
+      candidateId: applicant.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+    })
+    .returning();
+  const [draftApplication] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: draftJob.id,
+      candidateId: applicant.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+    })
+    .returning();
+  const response = await applicationsRouter.request("/applications", {
+    headers: { Cookie: userAuthCookie },
+  });
+  expect(response.status).toBe(200);
+  const body: { id: number }[] = await response.json();
+  const ids = body.map((row) => row.id);
+  expect(ids).toContain(closedApplication.id);
+  expect(ids).toContain(draftApplication.id);
+});
+
+test("recruiter cannot advance another recruiter's application", async () => {
+  const other = await getOrCreateRecruiter({
+    email: "advance-other@example.com",
+  });
+  const [job] = await db
+    .insert(jobsTable)
+    .values({ title: "Other job", status: "open", posterId: other.id })
+    .returning();
+  const [application] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: job.id,
+      candidateId: candidate.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+      status: "applied",
+    })
+    .returning();
+  const response = await applicationsRouter.request(
+    `/applications/${application.id}/next-stage`,
+    {
+      method: "POST",
+      headers: { Cookie: userAuthCookie },
+    },
+  );
+  expect(response.status).toBe(403);
+  expect(await response.json()).toEqual({ message: "Forbidden" });
+  const [row] = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.id, application.id));
+  expect(row.status).toBe("applied");
+});
+
+test("candidate cannot reject their own application", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({ title: "Own application job", status: "open", posterId })
+    .returning();
+  const [application] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: job.id,
+      candidateId: candidate.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+      status: "applied",
+    })
+    .returning();
+  const response = await applicationsRouter.request(
+    `/applications/${application.id}/reject`,
+    {
+      method: "POST",
+      headers: { Cookie: candidateAuthCookie },
+    },
+  );
+  expect(response.status).toBe(403);
+  const [row] = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.id, application.id));
+  expect(row.status).toBe("applied");
+});
+
+test("recruiter cannot advance an application on their deleted job", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Deleted own job",
+      status: "open",
+      posterId,
+      deletedAt: new Date(),
+    })
+    .returning();
+  const [application] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: job.id,
+      candidateId: candidate.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+      status: "screening",
+    })
+    .returning();
+  const response = await applicationsRouter.request(
+    `/applications/${application.id}/next-stage`,
+    {
+      method: "POST",
+      headers: { Cookie: userAuthCookie },
+    },
+  );
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ message: "Application not found" });
+  const [row] = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.id, application.id));
+  expect(row.status).toBe("screening");
+});
+
+test("admin can advance an application on a deleted job", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Deleted for admin",
+      status: "open",
+      posterId,
+      deletedAt: new Date(),
+    })
+    .returning();
+  const [application] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: job.id,
+      candidateId: candidate.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+      status: "applied",
+    })
+    .returning();
+  const admin = await getOrCreateUser({
+    email: "advance-admin@example.com",
+    name: "Advance Admin",
+    role: "admin",
+  });
+  const cookie = await createSessionCookie(admin.id);
+  const response = await applicationsRouter.request(
+    `/applications/${application.id}/next-stage`,
+    {
+      method: "POST",
+      headers: { Cookie: cookie },
+    },
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.status).toBe("screening");
+});
+
+test("recruiter can advance an application on their closed job", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({ title: "Closed own job", status: "closed", posterId })
+    .returning();
+  const [application] = await db
+    .insert(applicationsTable)
+    .values({
+      jobId: job.id,
+      candidateId: candidate.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+      status: "applied",
+    })
+    .returning();
+  const response = await applicationsRouter.request(
+    `/applications/${application.id}/next-stage`,
+    {
+      method: "POST",
+      headers: { Cookie: userAuthCookie },
+    },
+  );
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.status).toBe("screening");
+});
+
+test("admin cannot apply to a job", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({ title: "Admin apply", status: "open", posterId })
+    .returning();
+  const admin = await getOrCreateUser({
+    email: "apply-admin@example.com",
+    name: "Apply Admin",
+    role: "admin",
+  });
+  const cookie = await createSessionCookie(admin.id);
+  const response = await applicationsRouter.request("/applications", {
+    method: "POST",
+    body: JSON.stringify({
+      jobId: job.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: cookie,
+    },
+  });
+  expect(response.status).toBe(403);
+  const rows = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.jobId, job.id));
+  expect(rows).toHaveLength(0);
+});
+
+test("candidate cannot apply to a soft-deleted job", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Deleted apply",
+      status: "open",
+      posterId,
+      deletedAt: new Date(),
+    })
+    .returning();
+  const response = await applicationsRouter.request("/applications", {
+    method: "POST",
+    body: JSON.stringify({
+      jobId: job.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: candidateAuthCookie,
+    },
+  });
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ message: "Job not found" });
+});
+
+test("soft-deleted candidate cannot list applications", async () => {
+  const deletedCandidate = await getOrCreateUser({
+    email: "deleted-applicant@example.com",
+    name: "Deleted Applicant",
+    role: "candidate",
+    deletedAt: new Date(),
+  });
+  const cookie = await createSessionCookie(deletedCandidate.id);
+  const response = await applicationsRouter.request("/applications", {
+    headers: { Cookie: cookie },
+  });
+  expect(response.status).toBe(401);
 });
 
 afterAll(() => {
