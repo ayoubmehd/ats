@@ -4,11 +4,44 @@ import { OpenAPIHono } from "@hono/zod-openapi";
 import { usersTable as candidatesTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
 import { and, eq, isNull } from "drizzle-orm";
-import { verifyAuth } from "@hono/auth-js";
+import { verifyAuth } from "../auth.js";
+import { decide, resolveCaller } from "../authorization.js";
+import type { CandidateListAllow } from "../authorization.js";
 
 const app = new OpenAPIHono();
 
-app.use("*", verifyAuth());
+app.use("/candidates", verifyAuth());
+app.use("/candidates/:id", verifyAuth());
+
+const MessageSchema = z.object({
+  message: z.string(),
+});
+
+const ErrorSchema = z.object({
+  error: z.string(),
+});
+
+function messageResponse(description: string) {
+  return {
+    content: {
+      "application/json": {
+        schema: MessageSchema,
+      },
+    },
+    description,
+  };
+}
+
+function errorResponse(description: string) {
+  return {
+    content: {
+      "application/json": {
+        schema: ErrorSchema,
+      },
+    },
+    description,
+  };
+}
 
 const CreateCandidateSchema = z.object({
   name: z.string().min(1),
@@ -34,6 +67,35 @@ const CandidateSchema = z
   })
   .openapi("Candidate");
 
+function toCandidateResponse(candidate: {
+  id: string;
+  name: string;
+  email: string;
+}) {
+  return {
+    id: candidate.id,
+    name: candidate.name,
+    email: candidate.email,
+  };
+}
+
+async function findUser(id: string) {
+  const [user] = await db
+    .select()
+    .from(candidatesTable)
+    .where(eq(candidatesTable.id, id));
+  return user ?? null;
+}
+
+function candidatesWhere(decision: CandidateListAllow) {
+  if (decision.scope === "global") {
+    return and(
+      eq(candidatesTable.role, "candidate"),
+      isNull(candidatesTable.deletedAt),
+    );
+  }
+}
+
 export const getCandidatesRoute = createRoute({
   method: "get",
   path: "/candidates",
@@ -46,10 +108,21 @@ export const getCandidatesRoute = createRoute({
       },
       description: "Get all candidates",
     },
+    401: messageResponse("Unauthorized"),
+    403: messageResponse("Forbidden"),
   },
 });
 
 app.openapi(getCandidatesRoute, async (c) => {
+  const caller = await resolveCaller(c.get("authUser")?.user?.id);
+  const decision = decide(caller, { resource: "candidate", action: "list" });
+  if (decision.outcome === "unauthenticated") {
+    return c.json({ message: "Unauthorized" }, 401);
+  }
+  if (decision.outcome === "forbidden") {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+
   const candidates = await db
     .select({
       id: candidatesTable.id,
@@ -57,7 +130,7 @@ app.openapi(getCandidatesRoute, async (c) => {
       email: candidatesTable.email,
     })
     .from(candidatesTable)
-    .where(isNull(candidatesTable.deletedAt));
+    .where(candidatesWhere(decision));
 
   return c.json(candidates, 200);
 });
@@ -81,38 +154,27 @@ export const getCandidateRoute = createRoute({
       },
       description: "Get a candidate by id",
     },
-    404: {
-      content: {
-        "application/json": {
-          schema: z.object({
-            message: z.string(),
-          }),
-        },
-      },
-      description: "Candidate not found",
-    },
+    401: messageResponse("Unauthorized"),
+    403: messageResponse("Forbidden"),
+    404: messageResponse("Candidate not found"),
   },
 });
 
 app.openapi(getCandidateRoute, async (c) => {
   const { id } = c.req.valid("param");
-  const [candidate] = await db
-    .select({
-      id: candidatesTable.id,
-      name: candidatesTable.name,
-      email: candidatesTable.email,
-    })
-    .from(candidatesTable)
-    .where(and(eq(candidatesTable.id, id), isNull(candidatesTable.deletedAt)));
-  if (!candidate) {
-    return c.json(
-      {
-        message: "Candidate not found",
-      },
-      404,
-    );
+  const caller = await resolveCaller(c.get("authUser")?.user?.id);
+  const user = await findUser(id);
+  const decision = decide(caller, { resource: "candidate", action: "read", user });
+  if (decision.outcome === "unauthenticated") {
+    return c.json({ message: "Unauthorized" }, 401);
   }
-  return c.json(candidate, 200);
+  if (decision.outcome === "forbidden") {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+  if (decision.outcome === "not_found" || !user) {
+    return c.json({ message: "Candidate not found" }, 404);
+  }
+  return c.json(toCandidateResponse(user), 200);
 });
 
 export const createCandidateRoute = createRoute({
@@ -137,27 +199,44 @@ export const createCandidateRoute = createRoute({
       },
       description: "Candidate created successfully",
     },
-    400: {
-      content: {
-        "application/json": {
-          schema: z.object({
-            error: z.string(),
-          }),
-        },
-      },
-      description: "Candidate already exists",
-    },
+    400: errorResponse("Candidate already exists"),
+    401: messageResponse("Unauthorized"),
+    403: messageResponse("Forbidden"),
   },
 });
 
 app.openapi(createCandidateRoute, async (c) => {
   const { name, email } = await c.req.valid("json");
+  const caller = await resolveCaller(c.get("authUser")?.user?.id);
+  const decision = decide(caller, { resource: "candidate", action: "create" });
+  if (decision.outcome === "unauthenticated") {
+    return c.json({ message: "Unauthorized" }, 401);
+  }
+  if (decision.outcome === "forbidden") {
+    return c.json({ message: "Forbidden" }, 403);
+  }
 
-  const existingCandidate = await db
+  const existing = await db
     .select()
     .from(candidatesTable)
     .where(eq(candidatesTable.email, email));
-  if (existingCandidate.length > 0) {
+  const [only] = existing;
+  if (existing.length === 1 && only.role === "candidate" && only.deletedAt) {
+    const [restored] = await db
+      .update(candidatesTable)
+      .set({
+        name,
+        deletedAt: null,
+      })
+      .where(eq(candidatesTable.id, only.id))
+      .returning({
+        id: candidatesTable.id,
+        name: candidatesTable.name,
+        email: candidatesTable.email,
+      });
+    return c.json(restored, 201);
+  }
+  if (existing.length > 0) {
     return c.json(
       {
         error: "Candidate already exists",
@@ -209,12 +288,46 @@ export const updateCandidateRoute = createRoute({
       },
       description: "Candidate updated successfully",
     },
+    400: errorResponse("Candidate already exists"),
+    401: messageResponse("Unauthorized"),
+    403: messageResponse("Forbidden"),
+    404: messageResponse("Candidate not found"),
   },
 });
 
 app.openapi(updateCandidateRoute, async (c) => {
   const { id } = c.req.valid("param");
   const { name, email } = await c.req.valid("json");
+  const caller = await resolveCaller(c.get("authUser")?.user?.id);
+  const user = await findUser(id);
+  const decision = decide(caller, {
+    resource: "candidate",
+    action: "update",
+    user,
+  });
+  if (decision.outcome === "unauthenticated") {
+    return c.json({ message: "Unauthorized" }, 401);
+  }
+  if (decision.outcome === "forbidden") {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+  if (decision.outcome === "not_found" || !user) {
+    return c.json({ message: "Candidate not found" }, 404);
+  }
+
+  const taken = await db
+    .select({ id: candidatesTable.id })
+    .from(candidatesTable)
+    .where(eq(candidatesTable.email, email));
+  if (taken.some((row) => row.id !== id)) {
+    return c.json(
+      {
+        error: "Candidate already exists",
+      },
+      400,
+    );
+  }
+
   const [candidate] = await db
     .update(candidatesTable)
     .set({
@@ -222,15 +335,15 @@ app.openapi(updateCandidateRoute, async (c) => {
       email,
     })
     .where(and(eq(candidatesTable.id, id), isNull(candidatesTable.deletedAt)))
-    .returning();
-  return c.json(
-    {
-      id: candidate.id,
-      name: candidate.name,
-      email: candidate.email,
-    },
-    200,
-  );
+    .returning({
+      id: candidatesTable.id,
+      name: candidatesTable.name,
+      email: candidatesTable.email,
+    });
+  if (!candidate) {
+    return c.json({ message: "Candidate not found" }, 404);
+  }
+  return c.json(candidate, 200);
 });
 
 export const deleteCandidateRoute = createRoute({
@@ -247,18 +360,35 @@ export const deleteCandidateRoute = createRoute({
     200: {
       content: {
         "application/json": {
-          schema: z.object({
-            message: z.string(),
-          }),
+          schema: MessageSchema,
         },
       },
       description: "Candidate deleted successfully",
     },
+    401: messageResponse("Unauthorized"),
+    403: messageResponse("Forbidden"),
+    404: messageResponse("Candidate not found"),
   },
 });
 
 app.openapi(deleteCandidateRoute, async (c) => {
   const { id } = c.req.valid("param");
+  const caller = await resolveCaller(c.get("authUser")?.user?.id);
+  const user = await findUser(id);
+  const decision = decide(caller, {
+    resource: "candidate",
+    action: "delete",
+    user,
+  });
+  if (decision.outcome === "unauthenticated") {
+    return c.json({ message: "Unauthorized" }, 401);
+  }
+  if (decision.outcome === "forbidden") {
+    return c.json({ message: "Forbidden" }, 403);
+  }
+  if (decision.outcome === "not_found" || !user) {
+    return c.json({ message: "Candidate not found" }, 404);
+  }
   await db
     .update(candidatesTable)
     .set({ deletedAt: new Date() })

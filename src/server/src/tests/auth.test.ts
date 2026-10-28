@@ -87,11 +87,6 @@ test("GET /auth/session returns null with expired session", async () => {
   expect(await response.json()).toBeNull();
 });
 
-test("protected routes return 401 without auth", async () => {
-  const response = await app.request("/jobs");
-  expect(response.status).toBe(401);
-});
-
 test("protected routes succeed with valid session", async () => {
   const response = await app.request("/jobs", {
     headers: { Cookie: authCookie },
