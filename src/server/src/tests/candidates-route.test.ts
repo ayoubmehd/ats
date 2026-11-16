@@ -24,7 +24,7 @@ let lastCandidateId: string;
 
 beforeAll(async () => {
   const recruiter = await getOrCreateRecruiter({
-    email: "recruiter@example.com",
+    email: "candidates-recruiter@example.com",
   });
   authCookie = await createSessionCookie(recruiter.id);
   const admin = await getOrCreateUser({
@@ -34,7 +34,7 @@ beforeAll(async () => {
   });
   adminCookie = await createSessionCookie(admin.id);
   const candidate = await getOrCreateCandidate({
-    email: "candidate@example.com",
+    email: "candidates-candidate@example.com",
   });
   lastCandidateId = candidate.id;
 });
