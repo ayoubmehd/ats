@@ -3,7 +3,8 @@ import { createRoute } from "@hono/zod-openapi";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { applicationsTable, jobsTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
-import { and, eq, isNull } from "drizzle-orm";
+import { notDeleted } from "../db/live.js";
+import { and, eq } from "drizzle-orm";
 import { verifyAuth } from "../auth.js";
 import { decide, resolveCaller } from "../authorization.js";
 import type { ApplicationListAllow, JobRecord } from "../authorization.js";
@@ -79,6 +80,7 @@ function toApplicationResponse(
 }
 
 async function findJob(id: number) {
+  // Includes soft-deleted jobs so authorization can hide them as not found.
   const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, id));
   return job ?? null;
 }
@@ -95,6 +97,7 @@ async function findApplication(id: number) {
     .from(applicationsTable)
     .leftJoin(jobsTable, eq(applicationsTable.jobId, jobsTable.id))
     .where(eq(applicationsTable.id, id));
+  // The join includes soft-deleted jobs and applications; decide() hides them.
   if (!row) {
     return null;
   }
@@ -114,7 +117,7 @@ async function findApplication(id: number) {
 }
 
 function applicationsWhere(decision: ApplicationListAllow) {
-  const liveApplication = isNull(applicationsTable.deletedAt);
+  const liveApplication = notDeleted(applicationsTable);
   if (decision.scope === "global") {
     return liveApplication;
   }
@@ -122,13 +125,13 @@ function applicationsWhere(decision: ApplicationListAllow) {
     return and(
       liveApplication,
       eq(jobsTable.posterId, decision.posterId),
-      isNull(jobsTable.deletedAt),
+      notDeleted(jobsTable),
     );
   }
   return and(
     liveApplication,
     eq(applicationsTable.candidateId, decision.candidateId),
-    isNull(jobsTable.deletedAt),
+    notDeleted(jobsTable),
   );
 }
 
@@ -228,6 +231,7 @@ app.openapi(createApplicationRoute, async (c) => {
     );
   }
 
+  // Includes soft-deleted applications: the unique key still rejects a duplicate.
   const [existing] = await db
     .select({ id: applicationsTable.id })
     .from(applicationsTable)

@@ -25,4 +25,4 @@ separate `ats_test` database.
 ## Consequences
 
 - Compose creates `ats_test` on first Postgres init; `.test.env` points tests at it (done)
-- Implement repository/query helpers with soft-delete filter before routes proliferate
+- Soft-deleted rows are excluded by `notDeleted()` and `whereLive()` in `src/server/src/db/live.ts`, not by ad-hoc `isNull(deletedAt)` in routes (done)

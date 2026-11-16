@@ -20,6 +20,8 @@ const baseCulumns = {
   ...timestampColumns,
 };
 
+// Soft-deleted rows stay in the table. Reads that should hide them use
+// notDeleted() from ./live.ts, not an inline isNull(deletedAt).
 const softDelete = {
   deletedAt: timestamp(),
 };

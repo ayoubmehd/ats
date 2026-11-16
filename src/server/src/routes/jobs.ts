@@ -3,7 +3,8 @@ import { createRoute } from "@hono/zod-openapi";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { jobsTable, usersTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
-import { and, eq, isNull, or } from "drizzle-orm";
+import { notDeleted, whereLive } from "../db/live.js";
+import { eq, or } from "drizzle-orm";
 import type { MiddlewareHandler } from "hono";
 import { optionalAuth, verifyAuth } from "../auth.js";
 import { decide, resolveCaller } from "../authorization.js";
@@ -93,6 +94,7 @@ function toJobResponse(job: typeof jobsTable.$inferSelect) {
 }
 
 async function findJob(id: number) {
+  // Includes soft-deleted jobs so authorization can hide them as not found.
   const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, id));
   return job ?? null;
 }
@@ -105,6 +107,7 @@ async function posterRejection(posterId: string) {
     })
     .from(usersTable)
     .where(eq(usersTable.id, posterId));
+  // Includes a soft-deleted poster so the caller can reject them as missing.
   if (!poster || poster.deletedAt) {
     return { status: 404 as const, message: "Poster not found" as const };
   }
@@ -118,20 +121,19 @@ async function posterRejection(posterId: string) {
 }
 
 function jobsListWhere(decision: JobListAllow) {
-  const live = isNull(jobsTable.deletedAt);
   if (decision.scope === "open_only") {
-    return and(live, eq(jobsTable.status, "open"));
+    return whereLive(jobsTable, eq(jobsTable.status, "open"));
   }
   if (decision.scope === "own_and_open") {
-    return and(
-      live,
+    return whereLive(
+      jobsTable,
       or(
         eq(jobsTable.posterId, decision.posterId),
         eq(jobsTable.status, "open"),
       ),
     );
   }
-  return live;
+  return notDeleted(jobsTable);
 }
 
 export const getJobsRoute = createRoute({
