@@ -1,0 +1,21 @@
+---
+title: Navigation and information architecture for the board
+labels:
+  - wayfinder:grilling
+status: open
+parent: .scratch/frontend/map.md
+blocked-by:
+  - 05-which-pages-the-open-jobs-board-has.md
+---
+
+## Question
+
+The first surface is a public open-Jobs board. [Which pages the open-Jobs board has](05-which-pages-the-open-jobs-board-has.md) names the pages.
+
+Decide:
+
+- Which path on the Astro origin is the list (including whether it is `/`)
+- Which path is the Job page, if that page exists
+- What chrome the first slices include (header, links between those pages). Do not choose the Google start path; that is [Sign-in UX after Google](03-sign-in-ux.md).
+
+Do not inventory pages here. Do not add apply or a recruiter pipeline.
