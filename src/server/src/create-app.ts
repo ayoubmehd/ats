@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { bodyLimit } from "hono/body-limit";
 import { candidatesRouter } from "./routes/candidates.js";
 import { jobsRouter } from "./routes/jobs.js";
 import { db } from "./db/connection.js";
@@ -13,6 +14,8 @@ import {
   sessionsTable,
   verificationTokensTable,
 } from "./db/schema.js";
+import { JSON_BODY_MAX_BYTES } from "./limits.js";
+import { requireDev } from "./authorization.js";
 
 export function createApp() {
   if (!process.env.GOOGLE_ID || !process.env.GOOGLE_SECRET) {
@@ -24,6 +27,14 @@ export function createApp() {
   }
 
   const app = new OpenAPIHono();
+
+  app.use(
+    "*",
+    bodyLimit({
+      maxSize: JSON_BODY_MAX_BYTES,
+      onError: (c) => c.json({ message: "Payload too large" }, 413),
+    }),
+  );
 
   app.use(
     "*",
@@ -53,6 +64,21 @@ export function createApp() {
 
   app.use("/auth/*", authHandler());
 
+  app.route("/", candidatesRouter);
+  app.route("/", jobsRouter);
+  app.route("/", applicationsRouter);
+
+  registerInternalRoutes(app);
+
+  return app;
+}
+
+function registerInternalRoutes(app: OpenAPIHono) {
+  const requireDevAccess = requireDev();
+  app.use("/-/docs", requireDevAccess);
+  app.use("/-/scalar", requireDevAccess);
+  app.use("/-/db/health", requireDevAccess);
+
   app.get("/-/db/health", async (c) => {
     try {
       await db.execute("SELECT 1");
@@ -60,7 +86,7 @@ export function createApp() {
         status: "ok",
         message: "Database is healthy",
       });
-    } catch (error) {
+    } catch {
       return c.json(
         {
           status: "error",
@@ -70,10 +96,6 @@ export function createApp() {
       );
     }
   });
-
-  app.route("/", candidatesRouter);
-  app.route("/", jobsRouter);
-  app.route("/", applicationsRouter);
 
   app.doc("/-/docs", {
     openapi: "3.0.0",
@@ -89,6 +111,4 @@ export function createApp() {
       url: "/-/docs",
     }),
   );
-
-  return app;
 }

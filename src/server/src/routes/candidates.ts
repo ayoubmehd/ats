@@ -3,7 +3,8 @@ import { createRoute } from "@hono/zod-openapi";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { usersTable as candidatesTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
-import { and, eq, isNull } from "drizzle-orm";
+import { notDeleted, whereLive } from "../db/live.js";
+import { eq } from "drizzle-orm";
 import { verifyAuth } from "../auth.js";
 import { decide, resolveCaller } from "../authorization.js";
 import type { CandidateListAllow } from "../authorization.js";
@@ -80,6 +81,7 @@ function toCandidateResponse(candidate: {
 }
 
 async function findUser(id: string) {
+  // Includes soft-deleted users so authorization can hide them as not found.
   const [user] = await db
     .select()
     .from(candidatesTable)
@@ -89,9 +91,9 @@ async function findUser(id: string) {
 
 function candidatesWhere(decision: CandidateListAllow) {
   if (decision.scope === "global") {
-    return and(
+    return whereLive(
+      candidatesTable,
       eq(candidatesTable.role, "candidate"),
-      isNull(candidatesTable.deletedAt),
     );
   }
 }
@@ -216,6 +218,7 @@ app.openapi(createCandidateRoute, async (c) => {
     return c.json({ message: "Forbidden" }, 403);
   }
 
+  // Includes a soft-deleted candidate so the same email can be restored.
   const existing = await db
     .select()
     .from(candidatesTable)
@@ -315,6 +318,7 @@ app.openapi(updateCandidateRoute, async (c) => {
     return c.json({ message: "Candidate not found" }, 404);
   }
 
+  // Includes soft-deleted users: email stays unique after soft delete.
   const taken = await db
     .select({ id: candidatesTable.id })
     .from(candidatesTable)
@@ -334,7 +338,7 @@ app.openapi(updateCandidateRoute, async (c) => {
       name,
       email,
     })
-    .where(and(eq(candidatesTable.id, id), isNull(candidatesTable.deletedAt)))
+    .where(whereLive(candidatesTable, eq(candidatesTable.id, id)))
     .returning({
       id: candidatesTable.id,
       name: candidatesTable.name,
@@ -392,7 +396,7 @@ app.openapi(deleteCandidateRoute, async (c) => {
   await db
     .update(candidatesTable)
     .set({ deletedAt: new Date() })
-    .where(and(eq(candidatesTable.id, id), isNull(candidatesTable.deletedAt)));
+    .where(whereLive(candidatesTable, eq(candidatesTable.id, id)));
 
   return c.json(
     {

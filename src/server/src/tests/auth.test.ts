@@ -1,13 +1,13 @@
 import { createApp } from "../create-app.js";
 import { test, expect, beforeAll } from "vitest";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { pool } from "../db/connection.js";
 import { sessionsTable } from "../db/schema.js";
-import { createSessionCookie, getOrCreateRecruiter } from "./utils.js";
+import {
+  createSessionCookie,
+  getOrCreateRecruiter,
+  testDb as db,
+} from "./utils.js";
 
 const app = createApp();
-const client = await pool.connect();
-const db = drizzle(client);
 
 const authRecruiterEmail = "auth-recruiter@example.com";
 let recruiterId: string;

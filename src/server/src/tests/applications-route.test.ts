@@ -1,19 +1,15 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { pool } from "../db/connection.js";
 import { applicationsTable, jobsTable } from "../db/schema.js";
 import { applicationsRouter as applicationsRouterBase } from "../routes/applications.js";
-import { test, expect, beforeAll, afterAll } from "vitest";
+import { test, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
 import {
   createSessionCookie,
   getOrCreateCandidate,
   getOrCreateRecruiter,
   getOrCreateUser,
+  testDb as db,
   withAuth,
 } from "./utils.js";
-
-const client = await pool.connect();
-const db = drizzle(client);
 
 const applicationsRouter = withAuth(applicationsRouterBase);
 
@@ -1001,8 +997,4 @@ test("soft-deleted candidate cannot list applications", async () => {
     headers: { Cookie: cookie },
   });
   expect(response.status).toBe(401);
-});
-
-afterAll(() => {
-  db.$client.release();
 });

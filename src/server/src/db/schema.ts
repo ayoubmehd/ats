@@ -20,6 +20,8 @@ const baseCulumns = {
   ...timestampColumns,
 };
 
+// Soft-deleted rows stay in the table. Reads that should hide them use
+// notDeleted() from ./live.ts, not an inline isNull(deletedAt).
 const softDelete = {
   deletedAt: timestamp(),
 };
@@ -30,7 +32,7 @@ export const usersTable = pgTable("users", {
   email: varchar({ length: 255 }).notNull().unique(),
   role: varchar({
     length: 255,
-    enum: ["admin", "recruiter", "candidate"],
+    enum: ["admin", "recruiter", "candidate", "dev"],
   })
     .default("candidate")
     .notNull(),

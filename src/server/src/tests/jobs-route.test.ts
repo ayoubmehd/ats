@@ -1,5 +1,3 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { pool } from "../db/connection.js";
 import { jobsTable } from "../db/schema.js";
 import { jobsRouter as jobsRouterBase } from "../routes/jobs.js";
 import { test, expect, beforeAll } from "vitest";
@@ -8,10 +6,9 @@ import {
   createSessionCookie,
   getOrCreateRecruiter,
   getOrCreateUser,
+  testDb as db,
   withAuth,
 } from "./utils.js";
-const client = await pool.connect();
-const db = drizzle(client);
 
 const jobsRouter = withAuth(jobsRouterBase);
 

@@ -25,7 +25,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The API runs on http://localhost:3000, and the API reference is at http://localhost:3000/-/scalar.
+The API runs on http://localhost:3000, and the API reference is at http://localhost:3000/-/scalar. `/-/docs`, `/-/scalar`, and `/-/db/health` require a signed-in user whose role is `dev`.
 
 ## Test it
 

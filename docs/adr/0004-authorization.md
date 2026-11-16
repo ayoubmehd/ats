@@ -6,7 +6,7 @@ status: accepted
 
 Authorization builds on Auth.js sessions from ADR 0003. Authentication (`verifyAuth`)
 establishes identity; authorization middleware checks **role** (`admin`, `recruiter`,
-`candidate`) and **resource ownership** before handlers execute. Anonymous users get
+`candidate`, `dev`) and **resource ownership** before handlers execute. Anonymous users get
 read-only access to open job listings; everything else requires a session.
 
 ## Data model and ownership
@@ -22,7 +22,7 @@ erDiagram
     USER {
         varchar id PK
         varchar email UK
-        enum role "admin | recruiter | candidate"
+        enum role "admin | recruiter | candidate | dev"
         timestamp deletedAt
     }
 
@@ -61,7 +61,7 @@ erDiagram
     PERMISSION }o--|| ACTION : defines
 
     ROLE {
-        enum name "anonymous | admin | recruiter | candidate"
+        enum name "anonymous | admin | recruiter | candidate | dev"
     }
 
     RESOURCE {

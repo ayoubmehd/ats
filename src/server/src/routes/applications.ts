@@ -3,7 +3,12 @@ import { createRoute } from "@hono/zod-openapi";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import { applicationsTable, jobsTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
-import { and, eq, isNull } from "drizzle-orm";
+import { notDeleted } from "../db/live.js";
+import { and, eq } from "drizzle-orm";
+import {
+  RESUME_TEXT_MAX_LENGTH,
+  RESUME_URL_MAX_LENGTH,
+} from "../limits.js";
 import { verifyAuth } from "../auth.js";
 import { decide, resolveCaller } from "../authorization.js";
 import type { ApplicationListAllow, JobRecord } from "../authorization.js";
@@ -16,8 +21,8 @@ app.use("/applications/:id/reject", verifyAuth());
 
 const CreateApplicationSchema = z.object({
   jobId: z.number(),
-  resume: z.string(),
-  resumeText: z.string(),
+  resume: z.string().max(RESUME_URL_MAX_LENGTH),
+  resumeText: z.string().max(RESUME_TEXT_MAX_LENGTH),
 });
 
 const ApplicationStatusSchema = z.enum([
@@ -33,8 +38,8 @@ const ApplicationSchema = z.object({
   id: z.number(),
   jobId: z.number().nullable(),
   candidateId: z.string().nullable(),
-  resume: z.string(),
-  resumeText: z.string(),
+  resume: z.string().max(RESUME_URL_MAX_LENGTH),
+  resumeText: z.string().max(RESUME_TEXT_MAX_LENGTH),
   status: ApplicationStatusSchema,
   posterId: z.string().nullable(),
 });
@@ -79,6 +84,7 @@ function toApplicationResponse(
 }
 
 async function findJob(id: number) {
+  // Includes soft-deleted jobs so authorization can hide them as not found.
   const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, id));
   return job ?? null;
 }
@@ -95,6 +101,7 @@ async function findApplication(id: number) {
     .from(applicationsTable)
     .leftJoin(jobsTable, eq(applicationsTable.jobId, jobsTable.id))
     .where(eq(applicationsTable.id, id));
+  // The join includes soft-deleted jobs and applications; decide() hides them.
   if (!row) {
     return null;
   }
@@ -114,7 +121,7 @@ async function findApplication(id: number) {
 }
 
 function applicationsWhere(decision: ApplicationListAllow) {
-  const liveApplication = isNull(applicationsTable.deletedAt);
+  const liveApplication = notDeleted(applicationsTable);
   if (decision.scope === "global") {
     return liveApplication;
   }
@@ -122,13 +129,13 @@ function applicationsWhere(decision: ApplicationListAllow) {
     return and(
       liveApplication,
       eq(jobsTable.posterId, decision.posterId),
-      isNull(jobsTable.deletedAt),
+      notDeleted(jobsTable),
     );
   }
   return and(
     liveApplication,
     eq(applicationsTable.candidateId, decision.candidateId),
-    isNull(jobsTable.deletedAt),
+    notDeleted(jobsTable),
   );
 }
 
@@ -145,6 +152,7 @@ export const getApplicationsRoute = createRoute({
       description: "List applications visible to the caller",
     },
     401: messageResponse("Unauthorized"),
+    403: messageResponse("Forbidden"),
   },
 });
 
@@ -153,6 +161,9 @@ app.openapi(getApplicationsRoute, async (c) => {
   const decision = decide(caller, { resource: "application", action: "list" });
   if (decision.outcome === "unauthenticated") {
     return c.json({ message: "Unauthorized" }, 401);
+  }
+  if (decision.outcome === "forbidden") {
+    return c.json({ message: "Forbidden" }, 403);
   }
   const result = await db
     .select({
@@ -228,6 +239,7 @@ app.openapi(createApplicationRoute, async (c) => {
     );
   }
 
+  // Includes soft-deleted applications: the unique key still rejects a duplicate.
   const [existing] = await db
     .select({ id: applicationsTable.id })
     .from(applicationsTable)
