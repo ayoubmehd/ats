@@ -1,19 +1,15 @@
-import { drizzle } from "drizzle-orm/node-postgres";
-import { pool } from "../db/connection.js";
 import { usersTable } from "../db/schema.js";
 import { candidatesRouter as candidatesRouterBase } from "../routes/candidates.js";
-import { test, expect, beforeAll, afterAll } from "vitest";
+import { test, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
 import {
   createSessionCookie,
   getOrCreateCandidate,
   getOrCreateRecruiter,
   getOrCreateUser,
+  testDb as db,
   withAuth,
 } from "./utils.js";
-
-const client = await pool.connect();
-const db = drizzle(client);
 
 const candidatesRouter = withAuth(candidatesRouterBase);
 
@@ -397,8 +393,4 @@ test("admin can update a candidate with their current email", async () => {
     name: "Same Email Updated",
     email: candidate.email,
   });
-});
-
-afterAll(() => {
-  db.$client.release();
 });

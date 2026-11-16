@@ -3,8 +3,6 @@ import { initAuthConfig } from "@hono/auth-js";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { OpenAPIHono } from "@hono/zod-openapi";
 import type { Hono } from "hono";
-import { drizzle } from "drizzle-orm/node-postgres";
-import { pool } from "../db/connection.js";
 import { db } from "../db/connection.js";
 import {
   accountsTable,
@@ -13,8 +11,10 @@ import {
   verificationTokensTable,
 } from "../db/schema.js";
 import { and, eq } from "drizzle-orm";
-const client = await pool.connect();
-const testDb = drizzle(client);
+
+// Queries use the shared pool. It checks a connection out per query and
+// releases it, so test files must not call pool.connect() at module scope.
+export { db as testDb };
 
 function getAuthConfig() {
   return {
@@ -46,7 +46,7 @@ export function withAuth(router: OpenAPIHono) {
 export async function createSessionCookie(userId: string) {
   const sessionToken = randomUUID();
   const expires = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
-  await testDb.insert(sessionsTable).values({
+  await db.insert(sessionsTable).values({
     sessionToken,
     userId,
     expires,
@@ -73,7 +73,7 @@ async function insertUser(values: {
   deletedAt?: Date | null;
 }) {
   try {
-    const [created] = await testDb
+    const [created] = await db
       .insert(usersTable)
       .values({
         id: randomUUID(),
@@ -85,7 +85,7 @@ async function insertUser(values: {
     if (!isUniqueViolation(error)) {
       throw error;
     }
-    const [user] = await testDb
+    const [user] = await db
       .select()
       .from(usersTable)
       .where(eq(usersTable.email, values.email))
@@ -108,7 +108,7 @@ export async function getOrCreateUser({
   role: "admin" | "recruiter" | "candidate";
   deletedAt?: Date | null;
 }) {
-  const [user] = await testDb
+  const [user] = await db
     .select()
     .from(usersTable)
     .where(and(eq(usersTable.email, email), eq(usersTable.role, role)))
@@ -124,7 +124,7 @@ export async function getOrCreateRecruiter({
 }: {
   email: string;
 }) {
-  const [user] = await testDb
+  const [user] = await db
     .select()
     .from(usersTable)
     .where(eq(usersTable.email, email))
@@ -143,7 +143,7 @@ export async function getOrCreateCandidate({
 }: {
   email: string;
 }) {
-  const [user] = await testDb
+  const [user] = await db
     .select()
     .from(usersTable)
     .where(eq(usersTable.email, email))
