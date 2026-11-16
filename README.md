@@ -29,11 +29,21 @@ The API runs on http://localhost:3000, and the API reference is at http://localh
 
 ## Test it
 
+The first time Postgres initializes its data volume, Compose also creates `ats_test`.
+
 ```sh
 cd src/server
-docker compose exec postgres createdb -U postgres ats_test
+docker compose up -d
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ats_test pnpm db:migrate
 pnpm test
+```
+
+A volume created before that init script existed does not gain `ats_test` on restart. Create it without deleting data:
+
+```sh
+cd src/server
+./scripts/create-db.sh ats_test
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ats_test pnpm db:migrate
 ```
 
 ## Status
