@@ -478,3 +478,316 @@ test("recruiter create ignores a posterId in the body", async () => {
   const body = await response.json();
   expect(body.posterId).toBe(posterId);
 });
+
+async function adminCookie() {
+  const admin = await getOrCreateUser({
+    email: "poster-admin@example.com",
+    name: "Poster Admin",
+    role: "admin",
+  });
+  return createSessionCookie(admin.id);
+}
+
+test("admin create rejects an unknown poster", async () => {
+  const response = await jobsRouter.request("/jobs", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Unknown poster",
+      posterId: "missing-poster",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: await adminCookie(),
+    },
+  });
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ message: "Poster not found" });
+  const rows = await db
+    .select()
+    .from(jobsTable)
+    .where(eq(jobsTable.title, "Unknown poster"));
+  expect(rows).toHaveLength(0);
+});
+
+test("admin create rejects an empty poster id", async () => {
+  const response = await jobsRouter.request("/jobs", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Empty poster",
+      posterId: "",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: await adminCookie(),
+    },
+  });
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ message: "Poster not found" });
+  const rows = await db
+    .select()
+    .from(jobsTable)
+    .where(eq(jobsTable.title, "Empty poster"));
+  expect(rows).toHaveLength(0);
+});
+
+test("admin create rejects a candidate poster", async () => {
+  const candidate = await getOrCreateUser({
+    email: "poster-candidate@example.com",
+    name: "Poster Candidate",
+    role: "candidate",
+  });
+  const response = await jobsRouter.request("/jobs", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Candidate poster",
+      posterId: candidate.id,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: await adminCookie(),
+    },
+  });
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    message: "Poster must be a recruiter or admin",
+  });
+  const rows = await db
+    .select()
+    .from(jobsTable)
+    .where(eq(jobsTable.title, "Candidate poster"));
+  expect(rows).toHaveLength(0);
+});
+
+test("admin create rejects a soft-deleted poster", async () => {
+  const deleted = await getOrCreateUser({
+    email: "deleted-poster@example.com",
+    name: "Deleted Poster",
+    role: "recruiter",
+    deletedAt: new Date(),
+  });
+  const response = await jobsRouter.request("/jobs", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Deleted poster",
+      posterId: deleted.id,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: await adminCookie(),
+    },
+  });
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ message: "Poster not found" });
+  const rows = await db
+    .select()
+    .from(jobsTable)
+    .where(eq(jobsTable.title, "Deleted poster"));
+  expect(rows).toHaveLength(0);
+});
+
+test("admin create accepts a recruiter or admin poster", async () => {
+  const recruiter = await getOrCreateRecruiter({
+    email: "assigned-poster@example.com",
+  });
+  const admin = await getOrCreateUser({
+    email: "poster-admin@example.com",
+    name: "Poster Admin",
+    role: "admin",
+  });
+  const cookie = await createSessionCookie(admin.id);
+  const recruiterResponse = await jobsRouter.request("/jobs", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Assigned recruiter",
+      posterId: recruiter.id,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: cookie,
+    },
+  });
+  expect(recruiterResponse.status).toBe(201);
+  expect((await recruiterResponse.json()).posterId).toBe(recruiter.id);
+
+  const adminResponse = await jobsRouter.request("/jobs", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Assigned admin",
+      posterId: admin.id,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: cookie,
+    },
+  });
+  expect(adminResponse.status).toBe(201);
+  expect((await adminResponse.json()).posterId).toBe(admin.id);
+});
+
+test("admin create allows omitting posterId", async () => {
+  const response = await jobsRouter.request("/jobs", {
+    method: "POST",
+    body: JSON.stringify({
+      title: "Unassigned job",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: await adminCookie(),
+    },
+  });
+  expect(response.status).toBe(201);
+  expect((await response.json()).posterId).toBeNull();
+});
+
+test("admin update rejects a candidate poster and leaves the job unchanged", async () => {
+  const candidate = await getOrCreateUser({
+    email: "poster-candidate@example.com",
+    name: "Poster Candidate",
+    role: "candidate",
+  });
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Keep recruiter poster",
+      status: "open",
+      posterId,
+    })
+    .returning();
+  const response = await jobsRouter.request(`/jobs/${job.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      title: "Changed title",
+      posterId: candidate.id,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: await adminCookie(),
+    },
+  });
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    message: "Poster must be a recruiter or admin",
+  });
+  const [row] = await db.select().from(jobsTable).where(eq(jobsTable.id, job.id));
+  expect(row.title).toBe("Keep recruiter poster");
+  expect(row.posterId).toBe(posterId);
+});
+
+test("admin update rejects an unknown poster and leaves the job unchanged", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Keep unknown poster",
+      status: "open",
+      posterId,
+    })
+    .returning();
+  const response = await jobsRouter.request(`/jobs/${job.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      title: "Changed title",
+      posterId: "missing-poster",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: await adminCookie(),
+    },
+  });
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ message: "Poster not found" });
+  const [row] = await db.select().from(jobsTable).where(eq(jobsTable.id, job.id));
+  expect(row.title).toBe("Keep unknown poster");
+  expect(row.posterId).toBe(posterId);
+});
+
+test("admin update rejects a soft-deleted poster and leaves the job unchanged", async () => {
+  const deleted = await getOrCreateUser({
+    email: "deleted-poster@example.com",
+    name: "Deleted Poster",
+    role: "recruiter",
+    deletedAt: new Date(),
+  });
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Keep deleted poster",
+      status: "open",
+      posterId,
+    })
+    .returning();
+  const response = await jobsRouter.request(`/jobs/${job.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      title: "Changed title",
+      posterId: deleted.id,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: await adminCookie(),
+    },
+  });
+  expect(response.status).toBe(404);
+  expect(await response.json()).toEqual({ message: "Poster not found" });
+  const [row] = await db.select().from(jobsTable).where(eq(jobsTable.id, job.id));
+  expect(row.title).toBe("Keep deleted poster");
+  expect(row.posterId).toBe(posterId);
+});
+
+test("recruiter update keeps the poster when posterId is omitted", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Poster stays",
+      status: "draft",
+      posterId,
+    })
+    .returning();
+  const response = await jobsRouter.request(`/jobs/${job.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      title: "Poster stayed",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: authCookie,
+    },
+  });
+  expect(response.status).toBe(200);
+  const body = await response.json();
+  expect(body.title).toBe("Poster stayed");
+  expect(body.posterId).toBe(posterId);
+});
+
+test("recruiter update rejects a candidate poster", async () => {
+  const candidate = await getOrCreateUser({
+    email: "poster-candidate@example.com",
+    name: "Poster Candidate",
+    role: "candidate",
+  });
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Recruiter keeps poster",
+      status: "open",
+      posterId,
+    })
+    .returning();
+  const response = await jobsRouter.request(`/jobs/${job.id}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      title: "Should not change",
+      posterId: candidate.id,
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: authCookie,
+    },
+  });
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    message: "Poster must be a recruiter or admin",
+  });
+  const [row] = await db.select().from(jobsTable).where(eq(jobsTable.id, job.id));
+  expect(row.title).toBe("Recruiter keeps poster");
+  expect(row.posterId).toBe(posterId);
+});
