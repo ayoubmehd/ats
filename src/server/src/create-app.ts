@@ -1,4 +1,5 @@
 import { OpenAPIHono } from "@hono/zod-openapi";
+import { bodyLimit } from "hono/body-limit";
 import { candidatesRouter } from "./routes/candidates.js";
 import { jobsRouter } from "./routes/jobs.js";
 import { db } from "./db/connection.js";
@@ -13,6 +14,7 @@ import {
   sessionsTable,
   verificationTokensTable,
 } from "./db/schema.js";
+import { JSON_BODY_MAX_BYTES } from "./limits.js";
 
 export function createApp() {
   if (!process.env.GOOGLE_ID || !process.env.GOOGLE_SECRET) {
@@ -24,6 +26,14 @@ export function createApp() {
   }
 
   const app = new OpenAPIHono();
+
+  app.use(
+    "*",
+    bodyLimit({
+      maxSize: JSON_BODY_MAX_BYTES,
+      onError: (c) => c.json({ message: "Payload too large" }, 413),
+    }),
+  );
 
   app.use(
     "*",

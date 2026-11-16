@@ -5,6 +5,10 @@ import { applicationsTable, jobsTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
 import { notDeleted } from "../db/live.js";
 import { and, eq } from "drizzle-orm";
+import {
+  RESUME_TEXT_MAX_LENGTH,
+  RESUME_URL_MAX_LENGTH,
+} from "../limits.js";
 import { verifyAuth } from "../auth.js";
 import { decide, resolveCaller } from "../authorization.js";
 import type { ApplicationListAllow, JobRecord } from "../authorization.js";
@@ -17,8 +21,8 @@ app.use("/applications/:id/reject", verifyAuth());
 
 const CreateApplicationSchema = z.object({
   jobId: z.number(),
-  resume: z.string(),
-  resumeText: z.string(),
+  resume: z.string().max(RESUME_URL_MAX_LENGTH),
+  resumeText: z.string().max(RESUME_TEXT_MAX_LENGTH),
 });
 
 const ApplicationStatusSchema = z.enum([
@@ -34,8 +38,8 @@ const ApplicationSchema = z.object({
   id: z.number(),
   jobId: z.number().nullable(),
   candidateId: z.string().nullable(),
-  resume: z.string(),
-  resumeText: z.string(),
+  resume: z.string().max(RESUME_URL_MAX_LENGTH),
+  resumeText: z.string().max(RESUME_TEXT_MAX_LENGTH),
   status: ApplicationStatusSchema,
   posterId: z.string().nullable(),
 });
