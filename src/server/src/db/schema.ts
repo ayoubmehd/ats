@@ -32,7 +32,7 @@ export const usersTable = pgTable("users", {
   email: varchar({ length: 255 }).notNull().unique(),
   role: varchar({
     length: 255,
-    enum: ["admin", "recruiter", "candidate"],
+    enum: ["admin", "recruiter", "candidate", "dev"],
   })
     .default("candidate")
     .notNull(),

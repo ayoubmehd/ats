@@ -5,8 +5,12 @@ Software for recruiters to post jobs, collect applications, and move candidates 
 ## Language
 
 **User**:
-A person in the system with a role: admin, recruiter, or candidate.
+A person in the system with a role: admin, recruiter, candidate, or dev.
 _Avoid_: Account, member
+
+**Dev**:
+A User whose role is dev. May open the API reference and the database health check. Has no hiring permissions.
+_Avoid_: Engineer, staff
 
 **Candidate**:
 A User whose role is candidate. Not a separate entity or table.

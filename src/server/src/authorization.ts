@@ -1,8 +1,10 @@
 import { eq } from "drizzle-orm";
+import type { MiddlewareHandler } from "hono";
+import { verifyAuth } from "./auth.js";
 import { db } from "./db/connection.js";
 import { usersTable } from "./db/schema.js";
 
-export type Role = "admin" | "recruiter" | "candidate";
+export type Role = "admin" | "recruiter" | "candidate" | "dev";
 
 export type Caller =
   | { kind: "anonymous" }
@@ -121,6 +123,27 @@ export async function resolveCaller(
   return { kind: "user", id: user.id, role: user.role };
 }
 
+export function requireDev(): MiddlewareHandler {
+  const authenticate = verifyAuth();
+  return async (c, next) => {
+    let authenticated = false;
+    const denied = await authenticate(c, async () => {
+      authenticated = true;
+    });
+    if (!authenticated) {
+      return denied;
+    }
+    const caller = await resolveCaller(c.get("authUser")?.user?.id);
+    if (caller.kind !== "user") {
+      return c.json({ message: "Unauthorized" }, 401);
+    }
+    if (caller.role !== "dev") {
+      return c.json({ message: "Forbidden" }, 403);
+    }
+    await next();
+  };
+}
+
 export function decide(caller: Caller, request: JobListRequest): JobListAllow;
 export function decide(
   caller: Caller,
@@ -146,7 +169,7 @@ export function decide(
 export function decide(
   caller: Caller,
   request: ApplicationListRequest,
-): ApplicationListAllow | Extract<Denied, { outcome: "unauthenticated" }>;
+): ApplicationListAllow | Extract<Denied, { outcome: "unauthenticated" | "forbidden" }>;
 export function decide(caller: Caller, request: ApplyRequest): Allow | Denied;
 export function decide(
   caller: Caller,
@@ -167,13 +190,13 @@ function decideJob(
   request: JobListRequest | JobReadRequest | JobCreateRequest | JobWriteRequest,
 ): JobListAllow | JobCreateAllow | Allow | Denied {
   if (request.action === "list") {
-    if (caller.kind === "anonymous" || caller.role === "candidate") {
-      return { outcome: "allow", scope: "open_only" };
+    if (caller.kind === "user" && caller.role === "admin") {
+      return { outcome: "allow", scope: "global" };
     }
-    if (caller.role === "recruiter") {
+    if (caller.kind === "user" && caller.role === "recruiter") {
       return { outcome: "allow", scope: "own_and_open", posterId: caller.id };
     }
-    return { outcome: "allow", scope: "global" };
+    return { outcome: "allow", scope: "open_only" };
   }
 
   if (request.action === "read") {
@@ -199,7 +222,7 @@ function decideJob(
   if (caller.kind === "anonymous") {
     return unauthenticated;
   }
-  if (caller.role === "candidate") {
+  if (caller.role !== "admin" && caller.role !== "recruiter") {
     return forbidden;
   }
 
@@ -238,7 +261,7 @@ function decideCandidate(
     return unauthenticated;
   }
   if (request.action === "list" || request.action === "read") {
-    if (caller.role === "candidate") {
+    if (caller.role !== "admin" && caller.role !== "recruiter") {
       return forbidden;
     }
     if (request.action === "list") {
@@ -269,6 +292,9 @@ function decideApplication(
     if (caller.role === "recruiter") {
       return { outcome: "allow", scope: "own_jobs", posterId: caller.id };
     }
+    if (caller.role !== "candidate") {
+      return forbidden;
+    }
     return { outcome: "allow", scope: "own_apps", candidateId: caller.id };
   }
   if (request.action === "apply") {
@@ -288,6 +314,9 @@ function decideApplication(
   }
   if (caller.role === "admin") {
     return { outcome: "allow" };
+  }
+  if (caller.role !== "recruiter") {
+    return forbidden;
   }
   if (!request.job || request.job.deletedAt) {
     return notFound("Application not found");

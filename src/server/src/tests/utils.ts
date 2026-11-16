@@ -11,6 +11,7 @@ import {
   verificationTokensTable,
 } from "../db/schema.js";
 import { and, eq } from "drizzle-orm";
+import type { Role } from "../authorization.js";
 
 // Queries use the shared pool. It checks a connection out per query and
 // releases it, so test files must not call pool.connect() at module scope.
@@ -69,7 +70,7 @@ function isUniqueViolation(error: unknown) {
 async function insertUser(values: {
   email: string;
   name: string;
-  role: "admin" | "recruiter" | "candidate";
+  role: Role;
   deletedAt?: Date | null;
 }) {
   try {
@@ -105,7 +106,7 @@ export async function getOrCreateUser({
 }: {
   email: string;
   name: string;
-  role: "admin" | "recruiter" | "candidate";
+  role: Role;
   deletedAt?: Date | null;
 }) {
   const [user] = await db

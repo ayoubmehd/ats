@@ -15,6 +15,7 @@ import {
   verificationTokensTable,
 } from "./db/schema.js";
 import { JSON_BODY_MAX_BYTES } from "./limits.js";
+import { requireDev } from "./authorization.js";
 
 export function createApp() {
   if (!process.env.GOOGLE_ID || !process.env.GOOGLE_SECRET) {
@@ -67,14 +68,17 @@ export function createApp() {
   app.route("/", jobsRouter);
   app.route("/", applicationsRouter);
 
-  if (process.env.NODE_ENV !== "production") {
-    registerInternalRoutes(app);
-  }
+  registerInternalRoutes(app);
 
   return app;
 }
 
 function registerInternalRoutes(app: OpenAPIHono) {
+  const requireDevAccess = requireDev();
+  app.use("/-/docs", requireDevAccess);
+  app.use("/-/scalar", requireDevAccess);
+  app.use("/-/db/health", requireDevAccess);
+
   app.get("/-/db/health", async (c) => {
     try {
       await db.execute("SELECT 1");

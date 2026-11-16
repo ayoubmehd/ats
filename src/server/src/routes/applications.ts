@@ -152,6 +152,7 @@ export const getApplicationsRoute = createRoute({
       description: "List applications visible to the caller",
     },
     401: messageResponse("Unauthorized"),
+    403: messageResponse("Forbidden"),
   },
 });
 
@@ -160,6 +161,9 @@ app.openapi(getApplicationsRoute, async (c) => {
   const decision = decide(caller, { resource: "application", action: "list" });
   if (decision.outcome === "unauthenticated") {
     return c.json({ message: "Unauthorized" }, 401);
+  }
+  if (decision.outcome === "forbidden") {
+    return c.json({ message: "Forbidden" }, 403);
   }
   const result = await db
     .select({

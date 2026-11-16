@@ -14,7 +14,8 @@ Sessions use the **database strategy**: a signed HTTP-only cookie holds a sessio
 session state and the linked user are stored in PostgreSQL via the Drizzle adapter
 (`DrizzleAdapter` from `@hono/auth-js`). Protected routes use `verifyAuth()` to resolve
 the session into `c.get('authUser')`; authorization middleware then checks `role`
-(`admin`, `recruiter`, `candidate`) and resource ownership before handlers execute.
+(`admin`, `recruiter`, `candidate`, `dev`) and resource ownership before handlers execute.
+The `dev` role may open `/-/docs`, `/-/scalar`, and `/-/db/health`; it has no hiring permissions.
 
 Auth.js session tables (`sessions`, `accounts`, `verification_tokens`) are added alongside
 the existing `users` table defined in ADR 0001. The adapter links Auth.js identities to

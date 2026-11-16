@@ -11,6 +11,7 @@ import {
   createSessionCookie,
   getOrCreateCandidate,
   getOrCreateRecruiter,
+  getOrCreateUser,
   testDb,
 } from "./utils.js";
 
@@ -103,7 +104,14 @@ test("the server rejects a body over the byte limit", async () => {
 });
 
 test("openapi documents the resume field limits", async () => {
-  const response = await app.request("/-/docs");
+  const dev = await getOrCreateUser({
+    email: "limits-dev@example.com",
+    name: "Limits Dev",
+    role: "dev",
+  });
+  const response = await app.request("/-/docs", {
+    headers: { Cookie: await createSessionCookie(dev.id) },
+  });
   expect(response.status).toBe(200);
   const spec = await response.json();
   const schema =
