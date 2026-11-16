@@ -29,10 +29,11 @@ Tracker: local markdown in `.scratch/frontend/`. A ticket is a child when its fr
 - [Frontend testing ADR](issues/04-frontend-testing-adr.md): Vitest + Testing Library on React islands in `src/web`; E2E still deferred.
 - [Which pages the open-Jobs board has](issues/05-which-pages-the-open-jobs-board-has.md): list page and a Job page; apply stays off both.
 - [Navigation and information architecture for the board](issues/06-navigation-and-ia-for-the-board.md): list `/`, Job page `/:id`; header with always-on Sign in; ADR 0005 proxy prefixes stay.
+- [Astro island vs SSR on board pages](issues/07-island-vs-ssr-on-board-pages.md): static shells; both islands fetch `/jobs` and `/jobs/:id` in the browser.
 
 ## Not yet specified
 
-- Loading and fetch-failure UI on the list and Job page. Hangs on island vs SSR.
+<!-- see "Fog of war": in-scope fog you can't ticket yet; graduates as the frontier advances -->
 
 ## Out of scope
 
