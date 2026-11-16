@@ -24,6 +24,7 @@ Tracker: local markdown in `.scratch/frontend/`. A ticket is a child when its fr
 <!-- the index: one line per closed ticket, enough to judge relevance, then zoom the link for the detail the ticket holds -->
 
 - [Which product surface is first](issues/01-which-product-surface-is-first.md): public open-Jobs list and read for every caller; apply and recruiter pipeline wait.
+- [Visual system on top of Tailwind](issues/02-visual-system.md): shadcn/ui in React islands; Astro stays a thin shell; shadcn defaults, no custom theme.
 
 ## Not yet specified
 
@@ -38,3 +39,4 @@ Tracker: local markdown in `.scratch/frontend/`. A ticket is a child when its fr
 - A frontend test runner until its ADR exists.
 - Application create UI (apply). First slices are list and read only.
 - Recruiter pipeline UI. Later effort.
+- Custom visual theme (colors, radius, dark mode) for first slices. Implementers keep shadcn defaults.
