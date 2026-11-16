@@ -1,0 +1,15 @@
+---
+description: Astro pages with React islands; Hono is the only API
+globs: src/web/**
+alwaysApply: false
+---
+
+# Frontend (Astro + React)
+
+Follow ADR 0005.
+
+- Astro pages and layouts are the shell. React is only an island (`client:load`, `client:idle`, `client:visible`, …).
+- Do not add Astro endpoints or server actions that duplicate the Hono API.
+- The browser calls same-origin `/jobs`, `/applications`, `/candidates`, and `/auth`. The Vite/dev proxy (and later a reverse proxy) forwards those prefixes to the server on port 3000.
+- Do not store JWTs in `localStorage`. Sessions are Auth.js HTTP-only cookies from ADR 0003.
+- No product screens until the `.scratch/frontend/` wayfinder map is empty.

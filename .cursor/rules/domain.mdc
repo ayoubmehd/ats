@@ -1,0 +1,19 @@
+---
+description: Use the ATS domain glossary; do not invent synonyms
+alwaysApply: true
+---
+
+# Domain language
+
+Read `CONTEXT.md` before naming people, hiring records, or deletes. Read ADRs in `docs/adr/` that touch the area you are changing.
+
+Use these terms exactly:
+
+- **User** — a person with role admin, recruiter, candidate, or dev. Avoid: account, member.
+- **Dev** — a User whose role is dev. Avoid: engineer, staff.
+- **Candidate** — a User whose role is candidate, not a separate table. Avoid: applicant.
+- **Job** — a position posting. Avoid: opening, requisition.
+- **Application** — a Candidate's submission to a Job (at most one per candidate per job). Avoid: submission, candidacy.
+- **Soft delete** — `deletedAt` set; excluded from normal reads. Avoid: archive, deactivate.
+
+If a term is missing from `CONTEXT.md`, do not invent a synonym. Note the gap for `/grill-with-docs`.
