@@ -197,6 +197,7 @@ export const createApplicationRoute = createRoute({
     401: messageResponse("Unauthorized"),
     403: messageResponse("Forbidden"),
     404: messageResponse("Job not found"),
+    409: messageResponse("Application already exists"),
   },
 });
 
@@ -225,6 +226,19 @@ app.openapi(createApplicationRoute, async (c) => {
       },
       400,
     );
+  }
+
+  const [existing] = await db
+    .select({ id: applicationsTable.id })
+    .from(applicationsTable)
+    .where(
+      and(
+        eq(applicationsTable.jobId, jobId),
+        eq(applicationsTable.candidateId, caller.id),
+      ),
+    );
+  if (existing) {
+    return c.json({ message: "Application already exists" }, 409);
   }
 
   const [application] = await db

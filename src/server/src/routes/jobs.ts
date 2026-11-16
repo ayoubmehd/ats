@@ -1,7 +1,7 @@
 import { z } from "@hono/zod-openapi";
 import { createRoute } from "@hono/zod-openapi";
 import { OpenAPIHono } from "@hono/zod-openapi";
-import { jobsTable } from "../db/schema.js";
+import { jobsTable, usersTable } from "../db/schema.js";
 import { db } from "../db/connection.js";
 import { and, eq, isNull, or } from "drizzle-orm";
 import type { MiddlewareHandler } from "hono";
@@ -95,6 +95,26 @@ function toJobResponse(job: typeof jobsTable.$inferSelect) {
 async function findJob(id: number) {
   const [job] = await db.select().from(jobsTable).where(eq(jobsTable.id, id));
   return job ?? null;
+}
+
+async function posterRejection(posterId: string) {
+  const [poster] = await db
+    .select({
+      role: usersTable.role,
+      deletedAt: usersTable.deletedAt,
+    })
+    .from(usersTable)
+    .where(eq(usersTable.id, posterId));
+  if (!poster || poster.deletedAt) {
+    return { status: 404 as const, message: "Poster not found" as const };
+  }
+  if (poster.role !== "recruiter" && poster.role !== "admin") {
+    return {
+      status: 400 as const,
+      message: "Poster must be a recruiter or admin" as const,
+    };
+  }
+  return null;
 }
 
 function jobsListWhere(decision: JobListAllow) {
@@ -196,8 +216,10 @@ export const createJobRoute = createRoute({
       },
       description: "Job created successfully",
     },
+    400: messageResponse("Poster must be a recruiter or admin"),
     401: messageResponse("Unauthorized"),
     403: messageResponse("Forbidden"),
+    404: messageResponse("Poster not found"),
   },
 });
 
@@ -213,6 +235,18 @@ app.openapi(createJobRoute, async (c) => {
     return c.json({ message: "Forbidden" }, 403);
   }
 
+  const resolvedPosterId =
+    decision.posterSource === "caller" ? decision.posterId : posterId;
+  if (decision.posterSource === "body" && resolvedPosterId !== undefined) {
+    const rejection = await posterRejection(resolvedPosterId);
+    if (rejection?.status === 404) {
+      return c.json({ message: "Poster not found" }, 404);
+    }
+    if (rejection) {
+      return c.json({ message: "Poster must be a recruiter or admin" }, 400);
+    }
+  }
+
   const [job] = await db
     .insert(jobsTable)
     .values({
@@ -220,7 +254,7 @@ app.openapi(createJobRoute, async (c) => {
       summary,
       content,
       status,
-      posterId: decision.posterSource === "caller" ? decision.posterId : posterId,
+      posterId: resolvedPosterId,
     })
     .returning();
 
@@ -254,9 +288,10 @@ export const updateJobRoute = createRoute({
       },
       description: "Job updated successfully",
     },
+    400: messageResponse("Poster must be a recruiter or admin"),
     401: messageResponse("Unauthorized"),
     403: messageResponse("Forbidden"),
-    404: messageResponse("Job not found"),
+    404: messageResponse("Job or poster not found"),
   },
 });
 
@@ -276,6 +311,15 @@ app.openapi(updateJobRoute, async (c) => {
   if (decision.outcome === "not_found" || !job) {
     return c.json({ message: "Job not found" }, 404);
   }
+  if (posterId !== undefined) {
+    const rejection = await posterRejection(posterId);
+    if (rejection?.status === 404) {
+      return c.json({ message: "Poster not found" }, 404);
+    }
+    if (rejection) {
+      return c.json({ message: "Poster must be a recruiter or admin" }, 400);
+    }
+  }
 
   const [updatedJob] = await db
     .update(jobsTable)
@@ -284,7 +328,7 @@ app.openapi(updateJobRoute, async (c) => {
       summary,
       content,
       status,
-      posterId,
+      ...(posterId === undefined ? {} : { posterId }),
     })
     .where(eq(jobsTable.id, id))
     .returning();

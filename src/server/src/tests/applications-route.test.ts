@@ -833,6 +833,159 @@ test("candidate cannot apply to a soft-deleted job", async () => {
   expect(await response.json()).toEqual({ message: "Job not found" });
 });
 
+test("create application rejects a draft job", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Draft apply",
+      status: "draft",
+      posterId,
+    })
+    .returning();
+  const response = await applicationsRouter.request("/applications", {
+    method: "POST",
+    body: JSON.stringify({
+      jobId: job.id,
+      resume: "https://example.com/resume.pdf",
+      resumeText: "Resume",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: candidateAuthCookie,
+    },
+  });
+  expect(response.status).toBe(400);
+  expect(await response.json()).toEqual({
+    message: "Job is not open for applications",
+  });
+  const rows = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.jobId, job.id));
+  expect(rows).toHaveLength(0);
+});
+
+test("create application rejects a duplicate for the same candidate and job", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Duplicate apply",
+      status: "open",
+      posterId,
+    })
+    .returning();
+  await db.insert(applicationsTable).values({
+    jobId: job.id,
+    candidateId: candidate.id,
+    resume: "https://example.com/original.pdf",
+    resumeText: "Original",
+  });
+  const response = await applicationsRouter.request("/applications", {
+    method: "POST",
+    body: JSON.stringify({
+      jobId: job.id,
+      resume: "https://example.com/again.pdf",
+      resumeText: "Again",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: candidateAuthCookie,
+    },
+  });
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({
+    message: "Application already exists",
+  });
+  const rows = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.jobId, job.id));
+  expect(rows).toHaveLength(1);
+  expect(rows[0].resume).toBe("https://example.com/original.pdf");
+});
+
+test("create application rejects a duplicate of a soft-deleted application", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Deleted duplicate apply",
+      status: "open",
+      posterId,
+    })
+    .returning();
+  await db.insert(applicationsTable).values({
+    jobId: job.id,
+    candidateId: candidate.id,
+    resume: "https://example.com/deleted.pdf",
+    resumeText: "Deleted",
+    deletedAt: new Date(),
+  });
+  const response = await applicationsRouter.request("/applications", {
+    method: "POST",
+    body: JSON.stringify({
+      jobId: job.id,
+      resume: "https://example.com/again.pdf",
+      resumeText: "Again",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: candidateAuthCookie,
+    },
+  });
+  expect(response.status).toBe(409);
+  expect(await response.json()).toEqual({
+    message: "Application already exists",
+  });
+  const rows = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.jobId, job.id));
+  expect(rows).toHaveLength(1);
+  expect(rows[0].deletedAt).not.toBeNull();
+});
+
+test("another candidate can apply to a job that already has an application", async () => {
+  const [job] = await db
+    .insert(jobsTable)
+    .values({
+      title: "Shared apply",
+      status: "open",
+      posterId,
+    })
+    .returning();
+  await db.insert(applicationsTable).values({
+    jobId: job.id,
+    candidateId: candidate.id,
+    resume: "https://example.com/first.pdf",
+    resumeText: "First",
+  });
+  const other = await getOrCreateCandidate({
+    email: "other-applicant@example.com",
+  });
+  const cookie = await createSessionCookie(other.id);
+  const response = await applicationsRouter.request("/applications", {
+    method: "POST",
+    body: JSON.stringify({
+      jobId: job.id,
+      resume: "https://example.com/second.pdf",
+      resumeText: "Second",
+    }),
+    headers: {
+      "Content-Type": "application/json",
+      Cookie: cookie,
+    },
+  });
+  expect(response.status).toBe(201);
+  const body = await response.json();
+  expect(body.candidateId).toBe(other.id);
+  expect(body.jobId).toBe(job.id);
+  const rows = await db
+    .select()
+    .from(applicationsTable)
+    .where(eq(applicationsTable.jobId, job.id));
+  expect(rows).toHaveLength(2);
+});
+
 test("soft-deleted candidate cannot list applications", async () => {
   const deletedCandidate = await getOrCreateUser({
     email: "deleted-applicant@example.com",
