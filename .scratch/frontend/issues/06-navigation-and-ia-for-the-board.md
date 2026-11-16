@@ -16,6 +16,6 @@ Decide:
 
 - Which path on the Astro origin is the list (including whether it is `/`)
 - Which path is the Job page, if that page exists
-- What chrome the first slices include (header, links between those pages). Do not choose the Google start path; that is [Sign-in UX after Google](03-sign-in-ux.md).
+- What chrome the first slices include (header, links between those pages, whether a link to `/signin`). Google starts at `/signin`; that path is [Sign-in UX after Google](03-sign-in-ux.md). After a session, every role lands on the list; this ticket names that list path.
 
 Do not inventory pages here. Do not add apply or a recruiter pipeline.

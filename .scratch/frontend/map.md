@@ -25,6 +25,7 @@ Tracker: local markdown in `.scratch/frontend/`. A ticket is a child when its fr
 
 - [Which product surface is first](issues/01-which-product-surface-is-first.md): public open-Jobs list and read for every caller; apply and recruiter pipeline wait.
 - [Visual system on top of Tailwind](issues/02-visual-system.md): shadcn/ui in React islands; Astro stays a thin shell; shadcn defaults, no custom theme.
+- [Sign-in UX after Google](issues/03-sign-in-ux.md): Astro `/signin` starts Google; callback `/auth/callback/google`; every role lands on the open-Jobs list.
 
 ## Not yet specified
 
