@@ -27,11 +27,11 @@ Tracker: local markdown in `.scratch/frontend/`. A ticket is a child when its fr
 - [Visual system on top of Tailwind](issues/02-visual-system.md): shadcn/ui in React islands; Astro stays a thin shell; shadcn defaults, no custom theme.
 - [Sign-in UX after Google](issues/03-sign-in-ux.md): Astro `/signin` starts Google; callback `/auth/callback/google`; every role lands on the open-Jobs list.
 - [Frontend testing ADR](issues/04-frontend-testing-adr.md): Vitest + Testing Library on React islands in `src/web`; E2E still deferred.
+- [Which pages the open-Jobs board has](issues/05-which-pages-the-open-jobs-board-has.md): list page and a Job page; apply stays off both.
 
 ## Not yet specified
 
-- Job fields on the list and on a Job page. Hangs on which pages exist.
-- Empty list and missing-Job handling. Hangs on which pages exist.
+- Loading and fetch-failure UI on the list and Job page. Hangs on island vs SSR.
 
 ## Out of scope
 
