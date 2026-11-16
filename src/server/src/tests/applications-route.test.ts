@@ -21,12 +21,15 @@ let posterId: string;
 let applicationToRejectId: number;
 let userAuthCookie: string;
 let candidateAuthCookie: string;
-const candidate = await getOrCreateCandidate({
-  email: "candidate@example.com",
-});
+let candidate: { id: string };
 
 beforeAll(async () => {
-  const user = await getOrCreateRecruiter({ email: "recruiter@example.com" });
+  candidate = await getOrCreateCandidate({
+    email: "applications-candidate@example.com",
+  });
+  const user = await getOrCreateRecruiter({
+    email: "applications-recruiter@example.com",
+  });
   posterId = user.id;
   userAuthCookie = await createSessionCookie(user.id);
   candidateAuthCookie = await createSessionCookie(candidate.id);

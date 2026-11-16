@@ -25,12 +25,6 @@ async function truncateTables() {
   await db.execute(
     sql`TRUNCATE TABLE ${table(usersTable)} RESTART IDENTITY CASCADE`,
   );
-  await db.insert(usersTable).values({
-    id: "1",
-    name: "Recruiter",
-    email: "recruiter@example.com",
-    role: "recruiter",
-  });
 }
 
 export async function setup(project: TestProject) {

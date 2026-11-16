@@ -1,6 +1,6 @@
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pool } from "../db/connection.js";
-import { jobsTable, usersTable } from "../db/schema.js";
+import { jobsTable } from "../db/schema.js";
 import { jobsRouter as jobsRouterBase } from "../routes/jobs.js";
 import { test, expect, beforeAll } from "vitest";
 import { eq } from "drizzle-orm";
@@ -19,12 +19,10 @@ let posterId: string;
 let authCookie: string;
 
 beforeAll(async () => {
-  const [{ id }] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, "recruiter@example.com"))
-    .limit(1);
-  posterId = id;
+  const recruiter = await getOrCreateRecruiter({
+    email: "jobs-recruiter@example.com",
+  });
+  posterId = recruiter.id;
   authCookie = await createSessionCookie(posterId);
   await db.insert(jobsTable).values({
     title: "Software Engineer",

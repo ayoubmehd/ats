@@ -2,23 +2,23 @@ import { createApp } from "../create-app.js";
 import { test, expect, beforeAll } from "vitest";
 import { drizzle } from "drizzle-orm/node-postgres";
 import { pool } from "../db/connection.js";
-import { sessionsTable, usersTable } from "../db/schema.js";
-import { eq } from "drizzle-orm";
-import { createSessionCookie } from "./utils.js";
+import { sessionsTable } from "../db/schema.js";
+import { createSessionCookie, getOrCreateRecruiter } from "./utils.js";
 
 const app = createApp();
 const client = await pool.connect();
 const db = drizzle(client);
 
+const authRecruiterEmail = "auth-recruiter@example.com";
+let recruiterId: string;
 let authCookie: string;
 
 beforeAll(async () => {
-  const [{ id }] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, "recruiter@example.com"))
-    .limit(1);
-  authCookie = await createSessionCookie(id);
+  const recruiter = await getOrCreateRecruiter({
+    email: authRecruiterEmail,
+  });
+  recruiterId = recruiter.id;
+  authCookie = await createSessionCookie(recruiter.id);
 });
 
 test("GET /auth/session returns null without cookie", async () => {
@@ -33,7 +33,7 @@ test("GET /auth/session returns user with valid session cookie", async () => {
   });
   expect(response.status).toBe(200);
   const body = await response.json();
-  expect(body.user.email).toBe("recruiter@example.com");
+  expect(body.user.email).toBe(authRecruiterEmail);
   expect(body.user.name).toBe("Recruiter");
   expect(body.expires).toBeDefined();
 });
@@ -68,15 +68,10 @@ test("GET /auth/session returns null with invalid session cookie", async () => {
 });
 
 test("GET /auth/session returns null with expired session", async () => {
-  const [{ id }] = await db
-    .select()
-    .from(usersTable)
-    .where(eq(usersTable.email, "recruiter@example.com"))
-    .limit(1);
   const expiredToken = crypto.randomUUID();
   await db.insert(sessionsTable).values({
     sessionToken: expiredToken,
-    userId: id,
+    userId: recruiterId,
     expires: new Date(Date.now() - 1000),
   });
 
