@@ -25,7 +25,7 @@ pnpm db:migrate
 pnpm dev
 ```
 
-The API runs on http://localhost:3000, and the API reference is at http://localhost:3000/-/scalar.
+The API runs on http://localhost:3000, and the API reference is at http://localhost:3000/-/scalar. That reference, `/-/docs`, and `/-/db/health` are registered only when `NODE_ENV` is not `production`.
 
 ## Test it
 

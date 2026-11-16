@@ -63,6 +63,18 @@ export function createApp() {
 
   app.use("/auth/*", authHandler());
 
+  app.route("/", candidatesRouter);
+  app.route("/", jobsRouter);
+  app.route("/", applicationsRouter);
+
+  if (process.env.NODE_ENV !== "production") {
+    registerInternalRoutes(app);
+  }
+
+  return app;
+}
+
+function registerInternalRoutes(app: OpenAPIHono) {
   app.get("/-/db/health", async (c) => {
     try {
       await db.execute("SELECT 1");
@@ -70,7 +82,7 @@ export function createApp() {
         status: "ok",
         message: "Database is healthy",
       });
-    } catch (error) {
+    } catch {
       return c.json(
         {
           status: "error",
@@ -80,10 +92,6 @@ export function createApp() {
       );
     }
   });
-
-  app.route("/", candidatesRouter);
-  app.route("/", jobsRouter);
-  app.route("/", applicationsRouter);
 
   app.doc("/-/docs", {
     openapi: "3.0.0",
@@ -99,6 +107,4 @@ export function createApp() {
       url: "/-/docs",
     }),
   );
-
-  return app;
 }
