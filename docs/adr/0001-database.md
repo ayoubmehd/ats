@@ -24,5 +24,5 @@ separate `ats_test` database.
 
 ## Consequences
 
-- Add `ats_test` to docker-compose and point `.test.env` at it (done)
+- Compose creates `ats_test` on first Postgres init; `.test.env` points tests at it (done)
 - Implement repository/query helpers with soft-delete filter before routes proliferate
