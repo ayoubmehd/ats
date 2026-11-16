@@ -9,7 +9,10 @@ import {
 
 const timestampColumns = {
   createdAt: timestamp().defaultNow().notNull(),
-  updatedAt: timestamp().defaultNow().notNull(),
+  updatedAt: timestamp()
+    .defaultNow()
+    .notNull()
+    .$onUpdateFn(() => new Date()),
 };
 
 const baseCulumns = {
