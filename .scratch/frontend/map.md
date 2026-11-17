@@ -30,6 +30,8 @@ Tracker: local markdown in `.scratch/frontend/`. A ticket is a child when its fr
 - [Which pages the open-Jobs board has](issues/05-which-pages-the-open-jobs-board-has.md): list page and a Job page; apply stays off both.
 - [Navigation and information architecture for the board](issues/06-navigation-and-ia-for-the-board.md): list `/`, Job page `/:id`; header with always-on Sign in; ADR 0005 proxy prefixes stay.
 - [Astro island vs SSR on board pages](issues/07-island-vs-ssr-on-board-pages.md): static shells; both islands fetch `/jobs` and `/jobs/:id` in the browser.
+- [Job fields on the list and on a Job page](issues/08-job-fields-on-the-list-and-job-page.md): list title+summary; Job page title+summary+content; hide status/posterId; placeholders for missing copy; content as plain text.
+- [Empty list and missing-Job handling](issues/09-empty-list-and-missing-job.md): list “No open jobs”; Job page stays on `/:id` with “Job not available” for 404, 403, and non-open 200.
 
 ## Not yet specified
 
