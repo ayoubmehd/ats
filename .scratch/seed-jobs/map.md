@@ -35,11 +35,11 @@ Tracker: local markdown in `.scratch/seed-jobs/`. A ticket is a child when its f
 
 - [Which public job APIs can seed Jobs](issues/01-which-public-job-apis-can-seed-jobs.md): Jobicy, Himalayas, and Remotive survive no-paid-key + live GET + ToS for fetch/fixture/local DB; Remote OK is a fourth.
 - [How re-run replaces previous seed Jobs](issues/03-how-rerun-replaces-previous-seed-jobs.md): nullable Job `source`; seed writes `seed`; re-run hard-deletes those Jobs and their Applications; HTTP JSON unchanged.
+- [Which job API the seed uses](issues/02-which-job-api-the-seed-uses.md): Jobicy public GET, no key; terms cover fixture + local insert with credit and listing `url` in `content`.
 
 ## Not yet specified
 
 - Whether the spec requires tests for the seed script, and whether those tests may hit the network. ADR 0002 covers route and DB-backed tests, not this script.
-- If [Which job API the seed uses](issues/02-which-job-api-the-seed-uses.md) picks Himalayas' optional Bearer key or the USAJOBS fallback, where that secret lives.
 
 ## Out of scope
 
