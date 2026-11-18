@@ -33,3 +33,4 @@ coverage and test execution reliability are stable.
 - Significant additions to testing scope should be pressure-tested with
   `grill-with-docs` before implementation details are finalized.
 - A follow-up ADR is required to define frontend and E2E strategy.
+  Frontend component tests at React island seams are ADR 0006; E2E stays deferred.
