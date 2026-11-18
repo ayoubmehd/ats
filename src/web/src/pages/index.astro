@@ -1,7 +1,8 @@
 ---
-import Layout from '../layouts/Layout.astro';
+import BoardLayout from "../layouts/BoardLayout.astro";
+import { JobList } from "../components/JobList";
 ---
 
-<Layout>
-  <h1>ATS</h1>
-</Layout>
+<BoardLayout>
+  <JobList client:load />
+</BoardLayout>

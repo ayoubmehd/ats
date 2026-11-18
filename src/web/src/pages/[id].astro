@@ -1,0 +1,14 @@
+---
+import BoardLayout from "../layouts/BoardLayout.astro";
+import { JobPage } from "../components/JobPage";
+
+// The island still fetches GET /jobs/:id in the browser. prerender is off only
+// so any numeric Job.id can be served as this shell at request time.
+export const prerender = false;
+
+const { id } = Astro.params;
+---
+
+<BoardLayout>
+  <JobPage client:load jobId={id!} />
+</BoardLayout>

@@ -12,4 +12,4 @@ Follow ADR 0005.
 - Do not add Astro endpoints or server actions that duplicate the Hono API.
 - The browser calls same-origin `/jobs`, `/applications`, `/candidates`, and `/auth`. The Vite/dev proxy (and later a reverse proxy) forwards those prefixes to the server on port 3000.
 - Do not store JWTs in `localStorage`. Sessions are Auth.js HTTP-only cookies from ADR 0003.
-- No product screens until the `.scratch/frontend/` wayfinder map is empty.
+- First product surface is the public open-Jobs board: list at `/`, Job page at `/:id`, sign-in at `/signin`. React islands fetch `/jobs`, `/jobs/:id`, and `/auth`. Do not add apply or recruiter pipeline UI in this surface.

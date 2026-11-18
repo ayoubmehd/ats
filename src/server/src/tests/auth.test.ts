@@ -51,6 +51,15 @@ test("GET /auth/providers lists configured providers", async () => {
   expect(body.google.callbackUrl).toContain("/auth/callback/google");
 });
 
+test("GET /auth/signin sends the User to Astro /signin", async () => {
+  const response = await app.request("/auth/signin", { redirect: "manual" });
+  expect(response.status).toBeGreaterThanOrEqual(300);
+  expect(response.status).toBeLessThan(400);
+  const location = response.headers.get("location");
+  expect(location).toBeDefined();
+  expect(new URL(location!, "http://localhost:3000").pathname).toBe("/signin");
+});
+
 test("GET /auth/csrf returns csrf token", async () => {
   const response = await app.request("/auth/csrf");
   expect(response.status).toBe(200);

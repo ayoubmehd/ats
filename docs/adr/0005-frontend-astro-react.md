@@ -19,8 +19,8 @@ the same prefixes behind one reverse proxy. Auth.js HTTP-only cookies stay host-
 on the Astro origin. There is no CORS-with-credentials setup for v1. Hono remains
 the only API; Astro does not grow endpoints that duplicate it.
 
-This ADR does not add product screens. Frontend and E2E tests stay deferred as
-ADR 0002 required; a wayfinder ticket exists for the follow-up ADR.
+This ADR does not add product screens. Frontend component tests at React island
+seams are ADR 0006; E2E stays deferred as ADR 0002 required.
 
 ## Considered Options
 

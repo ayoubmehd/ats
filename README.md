@@ -57,8 +57,12 @@ cd src/server
 DATABASE_URL=postgresql://postgres:postgres@localhost:5432/ats_test pnpm db:migrate
 ```
 
-Frontend and E2E tests are not in this repo yet (ADR 0002).
+Frontend component tests run in the web package (ADR 0006). End-to-end browser tests stay deferred.
+
+```sh
+pnpm --filter web test
+```
 
 ## Status
 
-Work in progress. The browser app is an empty shell; product screens wait on the `.scratch/frontend/` wayfinder map.
+Work in progress. The browser app is a public open-Jobs board (`/` and `/:id`) plus `/signin`. Applying and the recruiter pipeline are later slices.
