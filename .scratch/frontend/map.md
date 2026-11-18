@@ -2,7 +2,7 @@
 title: Lock the ATS frontend for first UI slices
 labels:
   - wayfinder:map
-status: open
+status: closed
 ---
 
 ## Destination
@@ -27,11 +27,16 @@ Tracker: local markdown in `.scratch/frontend/`. A ticket is a child when its fr
 - [Visual system on top of Tailwind](issues/02-visual-system.md): shadcn/ui in React islands; Astro stays a thin shell; shadcn defaults, no custom theme.
 - [Sign-in UX after Google](issues/03-sign-in-ux.md): Astro `/signin` starts Google; callback `/auth/callback/google`; every role lands on the open-Jobs list.
 - [Frontend testing ADR](issues/04-frontend-testing-adr.md): Vitest + Testing Library on React islands in `src/web`; E2E still deferred.
+- [Which pages the open-Jobs board has](issues/05-which-pages-the-open-jobs-board-has.md): list page and a Job page; apply stays off both.
+- [Navigation and information architecture for the board](issues/06-navigation-and-ia-for-the-board.md): list `/`, Job page `/:id`; header with always-on Sign in; ADR 0005 proxy prefixes stay.
+- [Astro island vs SSR on board pages](issues/07-island-vs-ssr-on-board-pages.md): static shells; both islands fetch `/jobs` and `/jobs/:id` in the browser.
+- [Job fields on the list and on a Job page](issues/08-job-fields-on-the-list-and-job-page.md): list title+summary; Job page title+summary+content; hide status/posterId; placeholders for missing copy; content as plain text.
+- [Empty list and missing-Job handling](issues/09-empty-list-and-missing-job.md): list “No open jobs”; Job page stays on `/:id` with “Job not available” for 404, 403, and non-open 200.
+- [Loading and fetch-failure UI on board pages](issues/10-loading-and-fetch-failure-ui.md): shadcn Skeleton while in flight; lumped failure copy plus Retry.
 
 ## Not yet specified
 
-- Job fields on the list and on a Job page. Hangs on which pages exist.
-- Empty list and missing-Job handling. Hangs on which pages exist.
+<!-- see "Fog of war": in-scope fog you can't ticket yet; graduates as the frontier advances -->
 
 ## Out of scope
 
