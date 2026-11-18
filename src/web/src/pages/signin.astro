@@ -1,0 +1,10 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { SignIn } from "../components/SignIn";
+---
+
+<Layout title="Sign in">
+  <main class="mx-auto max-w-2xl px-4 py-6">
+    <SignIn client:load />
+  </main>
+</Layout>

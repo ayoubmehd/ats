@@ -58,6 +58,9 @@ export function createApp() {
         session: {
           strategy: "database",
         },
+        pages: {
+          signIn: "/signin",
+        },
       };
     }),
   );
