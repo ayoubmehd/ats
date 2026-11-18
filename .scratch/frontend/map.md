@@ -2,7 +2,7 @@
 title: Lock the ATS frontend for first UI slices
 labels:
   - wayfinder:map
-status: open
+status: closed
 ---
 
 ## Destination
@@ -32,6 +32,7 @@ Tracker: local markdown in `.scratch/frontend/`. A ticket is a child when its fr
 - [Astro island vs SSR on board pages](issues/07-island-vs-ssr-on-board-pages.md): static shells; both islands fetch `/jobs` and `/jobs/:id` in the browser.
 - [Job fields on the list and on a Job page](issues/08-job-fields-on-the-list-and-job-page.md): list title+summary; Job page title+summary+content; hide status/posterId; placeholders for missing copy; content as plain text.
 - [Empty list and missing-Job handling](issues/09-empty-list-and-missing-job.md): list “No open jobs”; Job page stays on `/:id` with “Job not available” for 404, 403, and non-open 200.
+- [Loading and fetch-failure UI on board pages](issues/10-loading-and-fetch-failure-ui.md): shadcn Skeleton while in flight; lumped failure copy plus Retry.
 
 ## Not yet specified
 
